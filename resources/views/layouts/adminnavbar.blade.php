@@ -126,6 +126,14 @@
                 </a>
             </li>
 
+            <li class="nav-item">
+                <a class="nav-link {{ activeLink('admin.company.index') }}"
+                   href="{{ route('admin.company.index') }}">
+                    <i class="material-symbols-rounded opacity-5">business</i>
+                    <span class="nav-link-text ms-1">Companies</span>
+                </a>
+            </li>
+
         </ul>
     </div>
 

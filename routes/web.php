@@ -6,6 +6,7 @@ use App\Http\Controllers\AdminControllers\AdminPurchacheOrderController;
 use App\Http\Controllers\AdminControllers\AdminQuotationController;
 use App\Http\Controllers\AdminControllers\AdminDeliveryNoteController;
 use App\Http\Controllers\AdminControllers\AdminReceiptController;
+use App\Http\Controllers\AdminControllers\AdminCompanyController;
 use App\Http\Controllers\PagesController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\CompanyController;
@@ -135,7 +136,7 @@ Route::prefix('purchase-orders')->name('purchase-order.')->group(function () {
     Route::delete('{purchaseOrder}', [AdminPurchacheOrderController::class, 'destroy'])->name('destroy');
     
     // Add these additional routes for full functionality:
-    
+
     // Status management
     Route::post('{purchaseOrder}/status', [AdminPurchacheOrderController::class, 'updateStatus'])->name('status.update');
     
@@ -147,6 +148,31 @@ Route::prefix('purchase-orders')->name('purchase-order.')->group(function () {
     Route::get('purchase-orders/generate-number', [AdminPurchacheOrderController::class, 'generateNumber'])->name('generate');
     Route::post('calculate-totals', [AdminPurchacheOrderController::class, 'calculateTotals'])->name('calculate.totals');
 });
+
+
+
+        /*
+    |--------------------------------------------------------------------------
+    | Admin company
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('company')->name('company.')->group(function () {
+        Route::get('admin/company/index', [AdminCompanyController::class, 'index'])->name('index');
+           // View Company (for modal - optional if using AJAX)
+        Route::get('admin/company/{id}', [AdminCompanyController::class, 'show'])->name('show');
+        
+        // Update Company
+        Route::put('admin/company/{id}', [AdminCompanyController::class, 'update'])->name('update');
+        
+        // Delete Company
+        Route::delete('admin/company/{id}', [AdminCompanyController::class, 'destroy'])->name('destroy');
+        
+        // Update Company Status
+        Route::post('admin/company/{id}/status', [AdminCompanyController::class, 'updateStatus'])->name('status');
+
+    });
+    //end of admin company
+
 
     /*
     |--------------------------------------------------------------------------

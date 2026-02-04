@@ -51,10 +51,7 @@ class DeliveryNote extends Model
     }
 
 
-        public function user()
-    {
-        return $this->belongsTo(User::class, 'company_id');
-    }
+
     /**
      * Generate unique delivery note number
      */

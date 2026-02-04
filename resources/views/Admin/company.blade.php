@@ -145,9 +145,31 @@
                     </div>
                 </div>
 
+                {{-- TIN --}}
+                <div class="col-md-6 mb-3">
+                    <div class="card">
+                        <div class="card-body">
+                            <label class="text-warning">TIN</label>
+                            <input type="text" name="tin" placeholder="Enter TIN Name" class="form-control border border-2 rounded-2 px-3">
+                        </div>
+                    </div>
+                </div>
+
+                {{-- VRN --}}
+                <div class="col-md-6 mb-3">
+                    <div class="card">
+                        <div class="card-body">
+                            <label class="text-warning">VRN</label>
+                            <input type="text" name="vrn" placeholder="Enter VRN Name" class="form-control border border-2 rounded-2 px-3 ">
+                        </div>
+                    </div>
+                </div>
+
+                
+
                 {{-- SUBMIT --}}
                 <div class="col-12 mt-3">
-                    <button type="submit" class="btn btn-warning">
+                    <button type="submit" class="btn btn-warning text-white">
                         Create Company
                     </button>
                 </div>

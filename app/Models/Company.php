@@ -21,6 +21,8 @@ class Company extends Authenticatable
         'last_login_at',
         'last_login_ip',
         'status',
+        'vrn',
+        'tin',
         'provider'
     ];
 
@@ -38,5 +40,25 @@ class Company extends Authenticatable
         public function quotations()
     {
         return $this->hasMany(Quotation::class);
+    }
+
+      public function invoice()
+    {
+        return $this->hasMany(Invoice::class);
+    }
+
+      public function deliveryNotes()
+    {
+        return $this->hasMany(DeliveryNote::class);
+    }
+
+       public function purchaseOrders()
+    {
+        return $this->hasMany(purchaseOrder::class);
+    }
+
+      public function receipts()
+    {
+        return $this->hasMany(Receipt::class);
     }
 }

@@ -14,7 +14,12 @@ class DashboardController extends Controller
 {
     public function dashboard(){
 
-        $Delivery = DeliveryNote::whereBelongsTo(Auth::user())->count();
+        $Delivery = DeliveryNote::whereHas('company', function ($query) {
+            $query->where('name', auth()->user()->company->name);
+        })->count();
+
+
+
         $Invoice = Invoice::whereBelongsTo(Auth::user())->count();
         $PO = PurchaseOrder::whereBelongsTo(Auth::user())->count();
         $Quotation = Quotation::whereBelongsTo(Auth::user())->count();
@@ -31,7 +36,7 @@ class DashboardController extends Controller
         $date = $today->copy()->subDays($i);
         $dateString = $date->format('Y-m-d');
         $dayLabel = $date->format('D'); // Mon, Tue, Wed, etc.
-        
+ 
         // Query documents created on this specific date
         $deliveryCount = DeliveryNote::whereDate('created_at', $dateString)->count();
         $invoiceCount = Invoice::whereDate('created_at', $dateString)->count();

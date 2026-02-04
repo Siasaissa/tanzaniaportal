@@ -23,6 +23,8 @@ class CompanyController extends Controller
             'logo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'company_desc' => 'nullable|string',
             'provider' => 'required|string|max:255',
+            'vrn' => 'required|string|max:255',
+            'tin' => 'required|string|max:255'
         ]);
 
         // Generate random password
@@ -43,6 +45,8 @@ class CompanyController extends Controller
             'company_desc' => $validated['company_desc'] ?? null,
             'password' => Hash::make($generatedPassword),
             'status' => 'active',
+            'vrn' => $validated['vrn'],
+            'tin' => $validated['tin'],
             'provider' => $validated['provider'],
             // Add other fields here
         ]);
@@ -63,6 +67,8 @@ class CompanyController extends Controller
      */
     public function update(Request $request, Company $company)
     {
+
+        
         $validated = $request->validate([
             'name' => 'sometimes|string|max:255',
             'email' => 'sometimes|string|email|max:255|unique:companies,email,' . $company->id,
@@ -70,6 +76,9 @@ class CompanyController extends Controller
             'company_desc' => 'nullable|string',
             'password' => 'nullable|string|min:8',
             'status' => 'sometimes|in:active,inactive,suspended',
+            'provider' => 'required|string|max:255',
+            'vrn' => 'required|string|max:255',
+            'tin' => 'required|string|max:255'
         ]);
 
         // Handle logo upload if exists
