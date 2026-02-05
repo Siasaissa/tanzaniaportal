@@ -121,6 +121,7 @@
     
     <div class="footer">
         <p>Generated on: {{ now()->format('F d, Y H:i:s') }}</p>
+                <p>Prepared by {{ $deliveryNote->company->name ?? Auth::user()->name }} under provider {{ $deliveryNote->company->provider ?? Auth::user()->name}}</p>
         <p>Thank you for your business!</p>
     </div>
 </body>

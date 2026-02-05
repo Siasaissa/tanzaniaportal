@@ -14,12 +14,7 @@ class DashboardController extends Controller
 {
     public function dashboard(){
 
-        $Delivery = DeliveryNote::whereHas('company', function ($query) {
-            $query->where('name', auth()->user()->company->name);
-        })->count();
-
-
-
+        $Delivery = DeliveryNote::whereBelongsTo(Auth::user())->count();
         $Invoice = Invoice::whereBelongsTo(Auth::user())->count();
         $PO = PurchaseOrder::whereBelongsTo(Auth::user())->count();
         $Quotation = Quotation::whereBelongsTo(Auth::user())->count();

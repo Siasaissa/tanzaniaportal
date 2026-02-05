@@ -56,16 +56,19 @@ class PurchaseOrder extends Model
      * Generate unique PO number
      */
 
-    public static function generatePONumber()
+    public static function generatePONumber($companyId)
     {
         $companyCode = strtoupper(substr(Auth::user()->name, 0, 3));
         $year = date('Y');
         $month = date('m');
         
-        $count = static::where('company_id', Auth::user()->id)
-            ->whereYear('created_at', $year)
-            ->whereMonth('created_at', $month)
-            ->count()+1;
+        $count = static::where(function ($query) use ($companyId) {
+                    $query->where('company_id', $companyId)
+                        ->orWhereNull('company_id');
+                })
+                ->whereYear('created_at', $year)
+                ->whereMonth('created_at', $month)
+                ->count() + 1;
         
 
         return sprintf('PO-%s-%s%s-%04d', $companyCode, $year, $month, $count);

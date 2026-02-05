@@ -51,7 +51,6 @@ class DeliveryNote extends Model
     }
 
 
-
     /**
      * Generate unique delivery note number
      */

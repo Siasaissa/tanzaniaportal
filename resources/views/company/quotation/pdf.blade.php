@@ -68,6 +68,7 @@
     <div class="footer">
         <p>Quotation Date: {{ $quotation->date->format('F d, Y') }}</p>
         <p>Thank you for your business!</p>
+        <p>Prepared by {{ $quotation->company->name ?? Auth::user()->name }} under provider {{ $quotation->company->provider ?? Auth::user()->name}}</p>
     </div>
 </body>
 </html>
