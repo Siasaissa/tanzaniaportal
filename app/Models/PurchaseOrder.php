@@ -287,4 +287,49 @@ public static function calculateOrderQuantities($items)
         'total_quantity' => $totalQuantity
     ];
 }
+
+// In PurchaseOrder.php model, add these methods:
+
+/**
+ * Get total quantity ordered (simple version)
+ */
+public function getTotalQuantityOrderedAttribute()
+{
+    $total = 0;
+    foreach ($this->formatted_items as $item) {
+        $total += floatval($item['quantity'] ?? 0);
+    }
+    return $total;
+}
+
+/**
+ * Get total quantity received from receipts
+ */
+public function getTotalQuantityReceivedAttribute()
+{
+    return $this->receipts()->where('status', '!=', 'cancelled')->sum('total_quantity_received');
+}
+
+
+/**
+ * Check if PO can receive more goods
+ */
+public function getCanReceiveMoreAttribute()
+{
+    // Must be in approved or ordered status
+    if (!in_array($this->status, ['approved', 'ordered'])) {
+        return false;
+    }
+    
+    // Calculate total received from all non-cancelled receipts
+    $totalReceived = $this->receipts()
+        ->where('status', '!=', 'cancelled')
+        ->sum('total_quantity_received');
+    
+    $totalOrdered = $this->total_quantity_ordered;
+    
+    // Return true if we can still receive more
+    return $totalReceived < $totalOrdered;
+}
+
 }

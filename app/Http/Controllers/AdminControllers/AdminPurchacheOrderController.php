@@ -102,7 +102,7 @@ class AdminPurchacheOrderController extends Controller
             'supplier_phone' => $request->supplier_phone,
             'supplier_address' => $request->supplier_address,
             'supplier_contact_person' => $request->supplier_contact_person,
-            'items' => json_encode($request->items),
+            'items' => $request->items,
             'subtotal' => $totals['subtotal'],
             'tax_rate' => $taxRate,
             'tax_amount' => $totals['tax_amount'],
@@ -148,6 +148,10 @@ class AdminPurchacheOrderController extends Controller
      */
     public function update(Request $request, PurchaseOrder $purchaseOrder)
     {
+
+
+
+
         if (!$purchaseOrder->can_edit) {
             return redirect()->route('company.purchase-order.index')
                 ->with('error', 'This purchase order cannot be edited.');
@@ -162,15 +166,15 @@ class AdminPurchacheOrderController extends Controller
             'supplier_address' => 'nullable|string',
             'supplier_contact_person' => 'nullable|string|max:255',
             'items' => 'required|array',
-            'items.*.description' => 'required|string',
-            'items.*.quantity' => 'required|numeric|min:1',
-            'items.*.price' => 'required|numeric|min:0',
+            'items.*.description' => 'nullable|string',
+            'items.*.quantity' => 'nullable|numeric|min:1',
+            'items.*.price' => 'nullable|numeric|min:0',
             'items.*.unit' => 'nullable|string',
             'tax_rate' => 'nullable|numeric|min:0|max:100',
             'discount' => 'nullable|numeric|min:0',
             'shipping_cost' => 'nullable|numeric|min:0',
             'status' => 'required|in:draft,pending_approval',
-            'payment_terms' => 'required|in:net_15,net_30,net_45,net_60,upon_delivery,advance_payment',
+            'payment_terms' => 'nullable|in:net_15,net_30,net_45,net_60,upon_delivery,advance_payment',
             'delivery_method' => 'nullable|in:pickup,delivery,courier,freight',
             'shipping_address' => 'nullable|string',
             'shipping_instructions' => 'nullable|string',
@@ -198,7 +202,7 @@ class AdminPurchacheOrderController extends Controller
             'supplier_phone' => $request->supplier_phone,
             'supplier_address' => $request->supplier_address,
             'supplier_contact_person' => $request->supplier_contact_person,
-            'items' => json_encode($request->items),
+            'items' => $request->items,
             'subtotal' => $totals['subtotal'],
             'tax_rate' => $taxRate,
             'tax_amount' => $totals['tax_amount'],

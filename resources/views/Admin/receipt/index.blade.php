@@ -16,13 +16,14 @@
               <h3 class="mb-0 h4 font-weight-bolder">Goods Receipts</h3>
               <p class="mb-0 text-sm">Manage goods received against purchase orders</p>
             </div>
+            
           </div>
         </div>
       </div>
 
       <!-- Stats Cards -->
       <div class="row">
-        <div class="col-xl-4 col-sm-6 mb-xl-0 mb-4">
+        <div class="col-xl-3 col-sm-6 mb-xl-0 mb-4">
           <div class="card">
             <div class="card-body p-3">
               <div class="row">
@@ -40,9 +41,25 @@
           </div>
         </div>
         
+        <div class="col-xl-3 col-sm-6 mb-xl-0 mb-4">
+          <div class="card">
+            <div class="card-body p-3">
+              <div class="row">
+                <div class="col-8">
+                  <p class="text-sm mb-0 text-capitalize font-weight-bold">Draft</p>
+                  <h5 class="font-weight-bolder mb-0">{{ $stats['draft'] ?? 0 }}</h5>
+                </div>
+                <div class="col-4 text-end">
+                  <div class="icon icon-shape bg-gradient-secondary shadow text-center border-radius-md">
+                    <i class="material-symbols-rounded opacity-10">draft</i>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
         
-        
-        <div class="col-xl-4 col-sm-6 mb-xl-0 mb-4">
+        <div class="col-xl-3 col-sm-6 mb-xl-0 mb-4">
           <div class="card">
             <div class="card-body p-3">
               <div class="row">
@@ -51,7 +68,7 @@
                   <h5 class="font-weight-bolder mb-0">{{ $stats['completed'] ?? 0 }}</h5>
                 </div>
                 <div class="col-4 text-end">
-                  <div class="icon icon-shape bg-gradient-warning shadow text-center border-radius-md">
+                  <div class="icon icon-shape bg-gradient-info shadow text-center border-radius-md">
                     <i class="material-symbols-rounded opacity-10">inventory</i>
                   </div>
                 </div>
@@ -60,8 +77,7 @@
           </div>
         </div>
         
-        
-        <div class="col-xl-4 col-sm-6 mb-xl-0 mb-4">
+        <div class="col-xl-3 col-sm-6 mb-xl-0 mb-4">
           <div class="card">
             <div class="card-body p-3">
               <div class="row">
@@ -70,7 +86,7 @@
                   <h5 class="font-weight-bolder mb-0">Tsh{{ number_format($stats['total_value'] ?? 0, 2) }}</h5>
                 </div>
                 <div class="col-4 text-end">
-                  <div class="icon icon-shape bg-gradient-warning shadow text-center border-radius-md">
+                  <div class="icon icon-shape bg-gradient-success shadow text-center border-radius-md">
                     <i class="material-symbols-rounded opacity-10">attach_money</i>
                   </div>
                 </div>
@@ -90,14 +106,15 @@
                   <h6>Receipts List</h6>
                   <p class="text-sm mb-0">
                     <i class="material-symbols-rounded text-info" style="font-size: 14px;">list</i>
-                    <span class="font-weight-bold ms-1">{{ $receipts->total() ?? 0 }} receipts</span>
+                    <span class="font-weight-bold ms-1">{{ $receipts->total() }} receipts</span>
                   </p>
                 </div>
                 <div class="input-group" style="width: 250px;">
                   <span class="input-group-text text-body">
                     <i class="material-symbols-rounded" style="font-size: 16px;">search</i>
                   </span>
-                  <input type="text" class="form-control" placeholder="Search receipts..." id="search-receipts">
+                  <input type="text" class="form-control" placeholder="Search receipts..." id="search-receipts" 
+                         oninput="filterTable(this.value, 'receipts-table')">
                 </div>
               </div>
             </div>
@@ -122,10 +139,20 @@
                       <td>
                         <div class="d-flex px-3 py-1">
                           <div class="d-flex flex-column justify-content-center">
-                            <h6 class="mb-0 text-sm">{{ $receipt->receipt_number ?? 'N/A' }}</h6>
+                            <h6 class="mb-0 text-sm">{{ $receipt->receipt_number }}</h6>
                             <p class="text-xs text-secondary mb-0">
                               <i class="material-symbols-rounded" style="font-size: 12px;">category</i>
-                              {{ $receipt->receipt_type_text ?? 'N/A' }}
+                              @if($receipt->receipt_type == 'full_delivery')
+                                Full Delivery
+                              @elseif($receipt->receipt_type == 'partial_delivery')
+                                Partial Delivery
+                              @elseif($receipt->receipt_type == 'return')
+                                Return
+                              @elseif($receipt->receipt_type == 'damaged_goods')
+                                Damaged Goods
+                              @else
+                                {{ $receipt->receipt_type }}
+                              @endif
                             </p>
                           </div>
                         </div>
@@ -137,7 +164,7 @@
                             @if($receipt->purchaseOrder)
                             <p class="text-xs text-secondary mb-0">
                               <i class="material-symbols-rounded" style="font-size: 10px;">calendar_month</i>
-                              {{ $receipt->purchaseOrder->po_date->format('M d, Y') ?? '' }}
+                              {{ $receipt->purchaseOrder->po_date->format('M d, Y') }}
                             </p>
                             @endif
                           </div>
@@ -146,7 +173,7 @@
                       <td>
                         <div class="d-flex px-2">
                           <div class="my-auto">
-                            <h6 class="mb-0 text-sm">{{ $receipt->supplier_name ?? 'N/A' }}</h6>
+                            <h6 class="mb-0 text-sm">{{ $receipt->supplier_name }}</h6>
                             @if($receipt->supplier_contact_person)
                             <p class="text-xs text-secondary mb-0">{{ $receipt->supplier_contact_person }}</p>
                             @endif
@@ -154,28 +181,39 @@
                         </div>
                       </td>
                       <td class="align-middle">
-                        <span class="text-xs font-weight-bold">{{ $receipt->receipt_date->format('M d, Y') ?? 'N/A' }}</span>
+                        <span class="text-xs font-weight-bold">{{ $receipt->receipt_date->format('M d, Y') }}</span>
                       </td>
                       <td class="align-middle">
                         <div class="d-flex flex-column">
-                          <span class="text-xs font-weight-bold">{{ $receipt->total_items_received ?? 0 }} items</span>
-                          <small class="text-xs text-info">{{ $receipt->total_quantity_received ?? 0 }} units</small>
+                          <span class="text-xs font-weight-bold">{{ $receipt->total_items_received }} items</span>
+                          <small class="text-xs text-info">{{ $receipt->total_quantity_received }} units</small>
                         </div>
                       </td>
                       <td class="align-middle">
-                        <span class="text-xs font-weight-bold text-success">Tsh{{ number_format($receipt->total_amount ?? 0, 2) }}</span>
+                        <span class="text-xs font-weight-bold text-success">Tsh{{ number_format($receipt->total_amount, 2) }}</span>
                       </td>
                       <td class="align-middle">
-                        <span class="badge badge-sm bg-gradient-{{ $receipt->status_color ?? 'secondary' }}">
-                          <i class="material-symbols-rounded" style="font-size: 12px; vertical-align: middle;">
-                            {{ $receipt->status_icon ?? 'receipt' }}
-                          </i>
-                          {{ ucfirst($receipt->status ?? 'unknown') }}
+                        @php
+                          $statusColor = match($receipt->status) {
+                            'draft' => 'secondary',
+                            'partial' => 'warning',
+                            'completed' => 'info',
+                            'verified' => 'success',
+                            'cancelled' => 'danger',
+                            default => 'secondary'
+                          };
+                        @endphp
+                        <span class="badge badge-sm bg-gradient-{{ $statusColor }}">
+                          {{ ucfirst($receipt->status) }}
                         </span>
-                        @if($receipt->condition != 'good' && $receipt->condition)
+                        @if($receipt->condition != 'good')
                         <br>
-                        <small class="badge badge-sm bg-{{ $receipt->condition == 'damaged' ? 'danger' : 'warning' }}">
-                          {{ $receipt->condition_text ?? '' }}
+                        @php
+                          $conditionColor = $receipt->condition == 'damaged' ? 'danger' : 
+                                           ($receipt->condition == 'poor' ? 'warning' : 'info');
+                        @endphp
+                        <small class="badge badge-sm bg-{{ $conditionColor }}">
+                          {{ ucfirst($receipt->condition) }}
                         </small>
                         @endif
                       </td>
@@ -186,26 +224,21 @@
                                   title="View">
                             <i class="material-symbols-rounded" style="font-size: 18px;">visibility</i>
                           </button>
-                          @if($receipt->can_edit ?? false)
+                          @if($receipt->status === 'draft')
                           <button type="button" class="btn btn-link text-warning px-2 mb-0" 
                                   data-bs-toggle="modal" data-bs-target="#editReceiptModal{{ $receipt->id }}" 
                                   title="Edit">
                             <i class="material-symbols-rounded" style="font-size: 18px;">edit</i>
                           </button>
                           @endif
-                          @if($receipt->can_verify ?? false)
+                          @if($receipt->status === 'completed')
                           <button type="button" class="btn btn-link text-success px-2 mb-0" 
                                   data-bs-toggle="modal" data-bs-target="#verifyReceiptModal{{ $receipt->id }}" 
                                   title="Verify">
                             <i class="material-symbols-rounded" style="font-size: 18px;">verified</i>
                           </button>
                           @endif
-                          <a href="{{ route('admin.receipt.download', $receipt) }}" 
-                             class="btn btn-link text-primary px-2 mb-0" 
-                             title="Download PDF">
-                            <i class="material-symbols-rounded" style="font-size: 18px;">download</i>
-                          </a>
-                          @if($receipt->can_delete ?? false)
+                          @if($receipt->status === 'draft')
                           <button type="button" class="btn btn-link text-danger px-2 mb-0" 
                                   data-bs-toggle="modal" data-bs-target="#deleteReceiptModal{{ $receipt->id }}" 
                                   title="Delete">
@@ -279,16 +312,14 @@
               <div class="col-md-6">
                 <div class="form-group mb-3">
                   <label for="purchase_order_id" class="form-control-label">Select Purchase Order *</label>
-                  <select class="form-control form-control-sm" name="purchase_order_id" id="purchase_order_id" required>
+                  <select class="form-control form-control-sm" name="purchase_order_id" id="purchase_order_id" required
+                          onchange="handlePOSelection(this)">
                     <option value="">-- Select Purchase Order --</option>
                     @foreach($purchaseOrders ?? [] as $po)
                     <option value="{{ $po->id }}"
                             data-po-number="{{ $po->po_number }}"
-                            data-supplier="{{ $po->supplier_name }}"
-                            data-total-ordered="{{ $po->total_quantity_ordered }}"
-                            data-total-received="{{ $po->total_quantity_received }}"
-                            data-remaining="{{ $po->remaining_quantity }}">
-                      {{ $po->po_number }} - {{ $po->supplier_name }} (Ordered: {{ $po->total_quantity_ordered }}, Received: {{ $po->total_quantity_received }})
+                            data-supplier="{{ $po->supplier_name }}">
+                      {{ $po->po_number }} - {{ $po->supplier_name }}
                     </option>
                     @endforeach
                   </select>
@@ -297,7 +328,8 @@
               <div class="col-md-6">
                 <div class="form-group mb-3">
                   <label for="receipt_type" class="form-control-label">Receipt Type *</label>
-                  <select class="form-control form-control-sm" name="receipt_type" id="receipt_type" required>
+                  <select class="form-control form-control-sm" name="receipt_type" id="receipt_type" required
+                          onchange="toggleReturnReason(this.value === 'return')">
                     <option value="full_delivery">Full Delivery</option>
                     <option value="partial_delivery">Partial Delivery</option>
                     <option value="return">Return</option>
@@ -316,7 +348,6 @@
                 </div>
                 <div class="col-md-6">
                   <p class="mb-1"><strong>Ordered:</strong> <span id="total-ordered-display"></span> units</p>
-                  <p class="mb-1"><strong>Already Received:</strong> <span id="total-received-display"></span> units</p>
                   <p class="mb-0"><strong>Remaining:</strong> <span id="remaining-display"></span> units</p>
                 </div>
               </div>
@@ -393,7 +424,7 @@
               <div class="col-md-6">
                 <div class="form-group mb-3">
                   <label class="form-control-label">Total Received</label>
-                  <input type="text" class="form-control form-control-sm bg-light" id="total-received-summary" value="0 units" readonly>
+                  <input type="text" class="form-control form-control-sm bg-light" id="total-received-summary" value="0 units / Tsh0.00" readonly>
                 </div>
               </div>
             </div>
@@ -459,10 +490,20 @@
                     <p class="text-xs mb-1"><strong>Type:</strong></p>
                   </div>
                   <div class="col-6">
-                    <p class="text-xs mb-1 text-dark">{{ $receipt->receipt_number ?? 'N/A' }}</p>
+                    <p class="text-xs mb-1 text-dark">{{ $receipt->receipt_number }}</p>
                     <p class="text-xs mb-1 text-dark">{{ $receipt->purchaseOrder->po_number ?? 'N/A' }}</p>
-                    <p class="text-xs mb-1 text-dark">{{ $receipt->receipt_date->format('M d, Y') ?? 'N/A' }}</p>
-                    <span class="badge badge-sm bg-info">{{ $receipt->receipt_type_text ?? 'N/A' }}</span>
+                    <p class="text-xs mb-1 text-dark">{{ $receipt->receipt_date->format('M d, Y') }}</p>
+                    @if($receipt->receipt_type == 'full_delivery')
+                      <span class="badge badge-sm bg-info">Full Delivery</span>
+                    @elseif($receipt->receipt_type == 'partial_delivery')
+                      <span class="badge badge-sm bg-warning">Partial Delivery</span>
+                    @elseif($receipt->receipt_type == 'return')
+                      <span class="badge badge-sm bg-danger">Return</span>
+                    @elseif($receipt->receipt_type == 'damaged_goods')
+                      <span class="badge badge-sm bg-danger">Damaged Goods</span>
+                    @else
+                      <span class="badge badge-sm bg-secondary">{{ $receipt->receipt_type }}</span>
+                    @endif
                   </div>
                 </div>
               </div>
@@ -474,18 +515,32 @@
                   <div class="col-6">
                     <p class="text-xs mb-1"><strong>Status:</strong></p>
                     <p class="text-xs mb-1"><strong>Condition:</strong></p>
-                    <p class="text-xs mb-1"><strong>Verified By:</strong></p>
-                    <p class="text-xs mb-1"><strong>Verified Date:</strong></p>
+                    <p class="text-xs mb-1"><strong>Received By:</strong></p>
+                    <p class="text-xs mb-1"><strong>Received Date:</strong></p>
                   </div>
                   <div class="col-6">
-                    <span class="badge badge-sm bg-gradient-{{ $receipt->status_color ?? 'secondary' }}">
-                      {{ ucfirst($receipt->status ?? 'unknown') }}
+                    @php
+                      $statusColor = match($receipt->status) {
+                        'draft' => 'secondary',
+                        'partial' => 'warning',
+                        'completed' => 'info',
+                        'verified' => 'success',
+                        'cancelled' => 'danger',
+                        default => 'secondary'
+                      };
+                    @endphp
+                    <span class="badge badge-sm bg-gradient-{{ $statusColor }}">
+                      {{ ucfirst($receipt->status) }}
                     </span>
-                    <span class="badge badge-sm bg-{{ ($receipt->condition ?? 'good') == 'damaged' ? 'danger' : 'warning' }}">
-                      {{ $receipt->condition_text ?? 'Good' }}
+                    @php
+                      $conditionColor = $receipt->condition == 'damaged' ? 'danger' : 
+                                       ($receipt->condition == 'poor' ? 'warning' : 'info');
+                    @endphp
+                    <span class="badge badge-sm bg-{{ $conditionColor }}">
+                      {{ ucfirst($receipt->condition) }}
                     </span>
-                    <p class="text-xs mb-1 text-dark">{{ $receipt->verifiedBy->name ?? 'Not verified' }}</p>
-                    <p class="text-xs mb-1 text-dark">{{ $receipt->verified_at ? $receipt->verified_at->format('M d, Y H:i') : 'N/A' }}</p>
+                    <p class="text-xs mb-1 text-dark">{{ $receipt->received_by_name ?? 'N/A' }}</p>
+                    <p class="text-xs mb-1 text-dark">{{ $receipt->created_at->format('M d, Y H:i') }}</p>
                   </div>
                 </div>
               </div>
@@ -496,9 +551,8 @@
             <div class="col-md-6">
               <div class="card card-body border">
                 <h6 class="text-sm font-weight-bold mb-3">Supplier Information</h6>
-                <p class="text-xs mb-1"><strong>Supplier:</strong> {{ $receipt->supplier_name ?? 'N/A' }}</p>
+                <p class="text-xs mb-1"><strong>Supplier:</strong> {{ $receipt->supplier_name }}</p>
                 <p class="text-xs mb-1"><strong>Contact Person:</strong> {{ $receipt->supplier_contact_person ?? 'N/A' }}</p>
-                <p class="text-xs mb-1"><strong>Contact Phone:</strong> {{ $receipt->supplier_contact_phone ?? 'N/A' }}</p>
               </div>
             </div>
             <div class="col-md-6">
@@ -512,17 +566,23 @@
             </div>
           </div>
           
+          @if($receipt->storage_location || $receipt->bin_location)
           <div class="card card-body border mb-4">
             <h6 class="text-sm font-weight-bold mb-3">Storage Information</h6>
             <div class="row">
+              @if($receipt->storage_location)
               <div class="col-md-6">
-                <p class="text-xs mb-1"><strong>Storage Location:</strong> {{ $receipt->storage_location ?? 'N/A' }}</p>
+                <p class="text-xs mb-1"><strong>Storage Location:</strong> {{ $receipt->storage_location }}</p>
               </div>
+              @endif
+              @if($receipt->bin_location)
               <div class="col-md-6">
-                <p class="text-xs mb-1"><strong>Bin/Rack:</strong> {{ $receipt->bin_location ?? 'N/A' }}</p>
+                <p class="text-xs mb-1"><strong>Bin/Rack:</strong> {{ $receipt->bin_location }}</p>
               </div>
+              @endif
             </div>
           </div>
+          @endif
           
           <h6 class="text-sm font-weight-bold mb-3">Received Items</h6>
           <div class="table-responsive">
@@ -538,15 +598,24 @@
                 </tr>
               </thead>
               <tbody>
-                @if(isset($receipt->items) && is_iterable($receipt->items))
-                  @foreach($receipt->items as $item)
+                @php
+                  // $receipt->items is already an array due to Laravel casting
+                  $items = is_array($receipt->items) ? $receipt->items : [];
+                @endphp
+                @if(count($items) > 0)
+                  @foreach($items as $item)
+                  @php
+                    $quantityReceived = $item['quantity_received'] ?? 0;
+                    $price = $item['price'] ?? 0;
+                    $total = $quantityReceived * $price;
+                  @endphp
                   <tr>
-                    <td class="text-xs">{{ $item->description ?? 'N/A' }}</td>
-                    <td class="text-xs text-center">{{ number_format($item->quantity_ordered ?? 0) }}</td>
-                    <td class="text-xs text-center">{{ number_format($item->quantity_received ?? 0) }}</td>
-                    <td class="text-xs text-center">{{ $item->unit ?? 'N/A' }}</td>
-                    <td class="text-xs text-center">Tsh{{ number_format($item->price ?? 0, 2) }}</td>
-                    <td class="text-xs text-center">Tsh{{ number_format(($item->quantity_received ?? 0) * ($item->price ?? 0), 2) }}</td>
+                    <td class="text-xs">{{ $item['description'] ?? 'N/A' }}</td>
+                    <td class="text-xs text-center">{{ number_format($item['quantity_ordered'] ?? 0) }}</td>
+                    <td class="text-xs text-center">{{ number_format($quantityReceived) }}</td>
+                    <td class="text-xs text-center">{{ $item['unit'] ?? 'pcs' }}</td>
+                    <td class="text-xs text-center">Tsh{{ number_format($price, 2) }}</td>
+                    <td class="text-xs text-center">Tsh{{ number_format($total, 2) }}</td>
                   </tr>
                   @endforeach
                 @else
@@ -558,9 +627,9 @@
               <tfoot class="bg-light">
                 <tr>
                   <td colspan="2" class="text-xs font-weight-bold">Summary</td>
-                  <td class="text-xs text-center font-weight-bold">{{ $receipt->total_quantity_received ?? 0 }} units</td>
-                  <td class="text-xs text-center font-weight-bold">{{ $receipt->total_items_received ?? 0 }} items</td>
-                  <td colspan="2" class="text-xs text-center font-weight-bold text-success">Total: Tsh{{ number_format($receipt->total_amount ?? 0, 2) }}</td>
+                  <td class="text-xs text-center font-weight-bold">{{ $receipt->total_quantity_received }} units</td>
+                  <td class="text-xs text-center font-weight-bold">{{ $receipt->total_items_received }} items</td>
+                  <td colspan="2" class="text-xs text-center font-weight-bold text-success">Total: Tsh{{ number_format($receipt->total_amount, 2) }}</td>
                 </tr>
               </tfoot>
             </table>
@@ -596,11 +665,6 @@
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
-          @if(route('admin.receipt.download', $receipt))
-          <a href="{{ route('admin.receipt.download', $receipt) }}" class="btn btn-info btn-sm">
-            <i class="material-symbols-rounded" style="font-size: 16px;">download</i> Download PDF
-          </a>
-          @endif
         </div>
       </div>
     </div>
@@ -610,7 +674,7 @@
   
   <!-- Edit Receipt Modals -->
   @foreach($receipts ?? [] as $receipt)
-  @if($receipt && ($receipt->can_edit ?? false))
+  @if($receipt && $receipt->status === 'draft')
   <div class="modal fade" id="editReceiptModal{{ $receipt->id }}" tabindex="-1" aria-labelledby="editReceiptModalLabel{{ $receipt->id }}" aria-hidden="true">
     <div class="modal-dialog modal-lg">
       <div class="modal-content">
@@ -642,7 +706,7 @@
                   <label for="receipt_date_{{ $receipt->id }}" class="form-control-label">Receipt Date *</label>
                   <input type="date" class="form-control form-control-sm" name="receipt_date" 
                          id="receipt_date_{{ $receipt->id }}" 
-                         value="{{ $receipt->receipt_date ? $receipt->receipt_date->format('Y-m-d') : date('Y-m-d') }}" required>
+                         value="{{ $receipt->receipt_date->format('Y-m-d') }}" required>
                 </div>
               </div>
             </div>
@@ -667,6 +731,44 @@
                   </select>
                 </div>
               </div>
+            </div>
+            
+            <!-- Items Section -->
+            <h6 class="text-sm font-weight-bold mb-3 mt-4">Received Items *</h6>
+            @php
+              // $receipt->items is already an array due to Laravel casting
+              $items = is_array($receipt->items) ? $receipt->items : [];
+            @endphp
+            <div id="edit-items-container-{{ $receipt->id }}">
+              @foreach($items as $index => $item)
+              <div class="item-row mb-3 p-2 border rounded">
+                <div class="row g-2">
+                  <div class="col-md-5">
+                    <input type="text" class="form-control form-control-sm" 
+                           value="{{ $item['description'] ?? '' }}" readonly>
+                    <input type="hidden" name="items[{{ $index }}][description]" value="{{ $item['description'] ?? '' }}">
+                    <input type="hidden" name="items[{{ $index }}][price]" value="{{ $item['price'] ?? 0 }}">
+                    <input type="hidden" name="items[{{ $index }}][unit]" value="{{ $item['unit'] ?? 'pcs' }}">
+                  </div>
+                  <div class="col-md-2">
+                    <input type="number" class="form-control form-control-sm" 
+                           value="{{ $item['quantity_ordered'] ?? 0 }}" readonly>
+                    <input type="hidden" name="items[{{ $index }}][quantity_ordered]" value="{{ $item['quantity_ordered'] ?? 0 }}">
+                  </div>
+                  <div class="col-md-3">
+                    <input type="number" class="form-control form-control-sm" 
+                           name="items[{{ $index }}][quantity_received]" 
+                           min="0" 
+                           value="{{ $item['quantity_received'] ?? 0 }}" 
+                           required>
+                  </div>
+                  <div class="col-md-2">
+                    <input type="text" class="form-control form-control-sm" 
+                           value="{{ $item['unit'] ?? 'pcs' }}" readonly>
+                  </div>
+                </div>
+              </div>
+              @endforeach
             </div>
             
             <h6 class="text-sm font-weight-bold mb-3 mt-4">Delivery Information</h6>
@@ -764,18 +866,6 @@
                 </div>
               </div>
             </div>
-            
-            <!-- Return Reason (only for returns) -->
-            <div class="row g-2 {{ $receipt->receipt_type != 'return' ? 'd-none' : '' }}" 
-                 id="return-reason-section-{{ $receipt->id }}">
-              <div class="col-md-12">
-                <div class="form-group mb-3">
-                  <label for="return_reason_{{ $receipt->id }}" class="form-control-label">Return Reason *</label>
-                  <textarea class="form-control form-control-sm" name="return_reason" 
-                            id="return_reason_{{ $receipt->id }}" rows="2">{{ $receipt->return_reason }}</textarea>
-                </div>
-              </div>
-            </div>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
@@ -790,7 +880,7 @@
   
   <!-- Verify Receipt Modals -->
   @foreach($receipts ?? [] as $receipt)
-  @if($receipt && ($receipt->can_verify ?? false))
+  @if($receipt && $receipt->status === 'completed')
   <div class="modal fade" id="verifyReceiptModal{{ $receipt->id }}" tabindex="-1" aria-labelledby="verifyReceiptModalLabel{{ $receipt->id }}" aria-hidden="true">
     <div class="modal-dialog">
       <div class="modal-content">
@@ -798,8 +888,9 @@
           <h5 class="modal-title text-white" id="verifyReceiptModalLabel{{ $receipt->id }}">Verify Goods Receipt</h5>
           <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
-        <form action="{{ route('admin.receipt.verify', $receipt) }}" method="POST">
+        <form action="{{ route('admin.receipt.status.update', $receipt) }}" method="POST">
           @csrf
+          <input type="hidden" name="status" value="verified">
           <div class="modal-body">
             <div class="text-center mb-3">
               <i class="material-symbols-rounded text-success" style="font-size: 64px;">verified</i>
@@ -851,7 +942,7 @@
   
   <!-- Delete Receipt Modals -->
   @foreach($receipts ?? [] as $receipt)
-  @if($receipt && ($receipt->can_delete ?? false))
+  @if($receipt && $receipt->status === 'draft')
   <div class="modal fade" id="deleteReceiptModal{{ $receipt->id }}" tabindex="-1" aria-labelledby="deleteReceiptModalLabel{{ $receipt->id }}" aria-hidden="true">
     <div class="modal-dialog">
       <div class="modal-content">
@@ -880,7 +971,7 @@
                   <p class="text-xs mb-1 text-dark">{{ $receipt->receipt_number }}</p>
                   <p class="text-xs mb-1 text-dark">{{ $receipt->supplier_name }}</p>
                   <p class="text-xs mb-1 text-dark">{{ $receipt->receipt_date->format('M d, Y') }}</p>
-                  <span class="badge badge-sm bg-gradient-{{ $receipt->status_color }}">
+                  <span class="badge badge-sm bg-gradient-secondary">
                     {{ ucfirst($receipt->status) }}
                   </span>
                 </div>
@@ -891,7 +982,7 @@
               <div class="d-flex">
                 <i class="material-symbols-rounded me-2">error</i>
                 <span class="text-sm">
-                  <strong>Warning:</strong> This action cannot be undone. All receipt data including items and verification records will be permanently deleted.
+                  <strong>Warning:</strong> This action cannot be undone. All receipt data will be permanently deleted.
                 </span>
               </div>
             </div>
@@ -922,281 +1013,218 @@
   @endif
   @endforeach
   
-
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   
   <script>
-    document.addEventListener('DOMContentLoaded', function() {
-      // Search functionality
-      const searchInput = document.getElementById('search-receipts');
-      if (searchInput) {
-        searchInput.addEventListener('input', function(e) {
-          const searchTerm = e.target.value.toLowerCase();
-          const rows = document.querySelectorAll('#receipts-table tbody tr');
-          
-          rows.forEach(row => {
+    // Simple table filter
+    function filterTable(searchTerm, tableId) {
+        const search = searchTerm.toLowerCase();
+        const table = document.getElementById(tableId);
+        if (!table) return;
+        
+        const rows = table.querySelectorAll('tbody tr');
+        rows.forEach(row => {
             const text = row.textContent.toLowerCase();
-            row.style.display = text.includes(searchTerm) ? '' : 'none';
-          });
+            row.style.display = text.includes(search) ? '' : 'none';
         });
-      }
-      
-      // Generate receipt number on modal show
-      const createModal = document.getElementById('createReceiptModal');
-      if (createModal) {
-        createModal.addEventListener('show.bs.modal', function() {
-          // Reset form
-          const form = document.getElementById('createReceiptForm');
-          if (form) form.reset();
-          
-          // Hide PO info
-          const poInfo = document.getElementById('po-info');
-          if (poInfo) poInfo.classList.add('d-none');
-          
-          // Hide return reason
-          const returnReason = document.getElementById('return-reason-section');
-          if (returnReason) returnReason.classList.add('d-none');
-          
-          // Clear items container
-          const itemsContainer = document.getElementById('receipt-items-container');
-          if (itemsContainer) itemsContainer.innerHTML = '';
-          
-          // Generate receipt number
-          generateReceiptNumber();
-        });
-      }
-      
-      // Handle PO selection change
-      const poSelect = document.getElementById('purchase_order_id');
-      if (poSelect) {
-        poSelect.addEventListener('change', function() {
-          const poId = this.value;
-          
-          if (!poId) {
-            const poInfo = document.getElementById('po-info');
-            if (poInfo) poInfo.classList.add('d-none');
-            
-            const itemsContainer = document.getElementById('receipt-items-container');
-            if (itemsContainer) itemsContainer.innerHTML = '';
-            
-            updateTotalReceivedSummary();
+    }
+    
+    // Handle PO selection
+    function handlePOSelection(selectElement) {
+        if (!selectElement.value) {
+            document.getElementById('po-info').classList.add('d-none');
+            document.getElementById('receipt-items-container').innerHTML = '';
+            updateTotalReceived();
             return;
-          }
-          
-          // Show loading
-          const itemsContainer = document.getElementById('receipt-items-container');
-          if (itemsContainer) {
-            itemsContainer.innerHTML = `
-              <div class="text-center py-3">
+        }
+        
+        // Show loading
+        const itemsContainer = document.getElementById('receipt-items-container');
+        itemsContainer.innerHTML = `
+            <div class="text-center py-3">
                 <div class="spinner-border spinner-border-sm text-primary" role="status">
-                  <span class="visually-hidden">Loading...</span>
+                    <span class="visually-hidden">Loading...</span>
                 </div>
                 <p class="text-sm text-muted mt-2">Loading PO details...</p>
-              </div>
-            `;
-          }
-          
-          // Fetch PO details
-          fetch(`/admin/receipts/purchase-order/${poId}/details`)
+            </div>
+        `;
+        
+        // Fetch PO details
+        fetch(`/admin/receipts/purchase-order/${selectElement.value}/details`)
             .then(response => response.json())
             .then(data => {
-              // Update PO info display
-              const poNumberDisplay = document.getElementById('po-number-display');
-              const supplierDisplay = document.getElementById('supplier-display');
-              const totalOrderedDisplay = document.getElementById('total-ordered-display');
-              const totalReceivedDisplay = document.getElementById('total-received-display');
-              const remainingDisplay = document.getElementById('remaining-display');
-              const poInfo = document.getElementById('po-info');
-              
-              if (poNumberDisplay) poNumberDisplay.textContent = data.po.po_number;
-              if (supplierDisplay) supplierDisplay.textContent = data.po.supplier_name;
-              if (totalOrderedDisplay) totalOrderedDisplay.textContent = data.total_ordered;
-              if (totalReceivedDisplay) totalReceivedDisplay.textContent = data.total_received;
-              if (remainingDisplay) remainingDisplay.textContent = data.remaining;
-              if (poInfo) poInfo.classList.remove('d-none');
-              
-              // Populate items
-              let itemsHtml = '';
-              if (data.items && Array.isArray(data.items)) {
-                data.items.forEach((item, index) => {
-                  itemsHtml += `
-                    <div class="item-row mb-3 p-2 border rounded">
-                      <div class="row g-2">
-                        <div class="col-md-5">
-                          <input type="text" class="form-control form-control-sm" 
-                                 value="${item.description}" readonly>
-                          <input type="hidden" name="items[${index}][description]" value="${item.description}">
-                          <input type="hidden" name="items[${index}][quantity_ordered]" value="${item.quantity_ordered}">
-                          <input type="hidden" name="items[${index}][price]" value="${item.price}">
-                          <input type="hidden" name="items[${index}][unit]" value="${item.unit}">
-                        </div>
-                        <div class="col-md-2">
-                          <input type="number" class="form-control form-control-sm" 
-                                 value="${item.quantity_ordered}" readonly>
-                        </div>
-                        <div class="col-md-2">
-                          <input type="number" class="form-control form-control-sm receipt-quantity" 
-                                 name="items[${index}][quantity_received]" 
-                                 min="0" max="${item.remaining}" 
-                                 value="0" data-remaining="${item.remaining}" required>
-                        </div>
-                        <div class="col-md-2">
-                          <input type="text" class="form-control form-control-sm" 
-                                 value="${item.unit}" readonly>
-                        </div>
-                        <div class="col-md-1">
-                          <span class="badge badge-sm bg-info">Remaining: ${item.remaining}</span>
-                        </div>
-                      </div>
-                    </div>
-                  `;
-                });
-              }
-              
-              if (itemsContainer) {
-                itemsContainer.innerHTML = itemsHtml;
+                // Show PO info
+                const poInfo = document.getElementById('po-info');
+                document.getElementById('po-number-display').textContent = data.po?.po_number || 'N/A';
+                document.getElementById('supplier-display').textContent = data.po?.supplier_name || 'N/A';
+                document.getElementById('total-ordered-display').textContent = data.total_ordered || 0;
+                document.getElementById('remaining-display').textContent = data.remaining || 0;
+                poInfo.classList.remove('d-none');
                 
-                // Add event listeners to quantity inputs
-                document.querySelectorAll('.receipt-quantity').forEach(input => {
-                  input.addEventListener('input', updateTotalReceivedSummary);
-                });
-              }
-              
-              updateTotalReceivedSummary();
+                // Populate items
+                populateItems(data.items || []);
             })
             .catch(error => {
-              console.error('Error loading PO details:', error);
-              if (itemsContainer) {
+                console.error('Error:', error);
                 itemsContainer.innerHTML = `
-                  <div class="alert alert-danger">
-                    Error loading PO details. Please try again.
-                  </div>
+                    <div class="alert alert-danger">
+                        Error loading PO details. Please try again.
+                    </div>
                 `;
-              }
             });
-        });
-      }
-      
-      // Handle receipt type change in create modal
-      const receiptTypeSelect = document.getElementById('receipt_type');
-      if (receiptTypeSelect) {
-        receiptTypeSelect.addEventListener('change', function() {
-          const isReturn = this.value === 'return';
-          const returnReasonSection = document.getElementById('return-reason-section');
-          if (returnReasonSection) {
-            returnReasonSection.classList.toggle('d-none', !isReturn);
-          }
-          
-          // Update quantity validation for returns
-          if (isReturn) {
-            document.querySelectorAll('.receipt-quantity').forEach(input => {
-              input.removeAttribute('max');
-            });
-          } else {
-            document.querySelectorAll('.receipt-quantity').forEach(input => {
-              const remaining = input.getAttribute('data-remaining');
-              if (remaining) input.setAttribute('max', remaining);
-            });
-          }
-        });
-      }
-      
-      // Handle receipt type change in edit modals
-      document.querySelectorAll('[id^="receipt_type_"]').forEach(select => {
-        select.addEventListener('change', function() {
-          const receiptId = this.id.split('_')[2];
-          const isReturn = this.value === 'return';
-          const returnReasonSection = document.getElementById(`return-reason-section-${receiptId}`);
-          if (returnReasonSection) {
-            returnReasonSection.classList.toggle('d-none', !isReturn);
-          }
-        });
-      });
-      
-      // Calculate total received summary
-      function updateTotalReceivedSummary() {
-        let totalReceived = 0;
-        
-        document.querySelectorAll('.receipt-quantity').forEach(input => {
-          totalReceived += parseFloat(input.value) || 0;
-        });
-        
-        const totalSummary = document.getElementById('total-received-summary');
-        if (totalSummary) {
-          totalSummary.value = `${totalReceived} units`;
-        }
-      }
-      
-      // Generate Receipt Number Function
-      function generateReceiptNumber() {
-        const receiptNumberField = document.getElementById('receipt_number');
-        if (!receiptNumberField) return;
-        
-        fetch('{{ route("admin.receipt.generate") }}')
-          .then(response => {
-            if (!response.ok) {
-              throw new Error('Network response was not ok');
-            }
-            return response.json();
-          })
-          .then(data => {
-            receiptNumberField.value = data.receipt_number || data;
-          })
-          .catch(error => {
-            console.log('AJAX failed, using local generation:', error);
-            // Fallback local generation
-            const date = new Date();
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const day = String(date.getDate()).padStart(2, '0');
-            const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-            const receiptNumber = `RC-${year}${month}${day}-${random}`;
+    }
+    
+    // Simple populate items
+    // Simple populate items
+function populateItems(items) {
+    const container = document.getElementById('receipt-items-container');
+    let html = '';
+    
+    if (items.length === 0) {
+        html = '<div class="alert alert-info">No items found in this purchase order.</div>';
+    } else {
+        items.forEach((item, index) => {
+            const description = item.description || '';
+            const quantityOrdered = item.quantity_ordered || 0;
+            const price = parseFloat(item.price) || 0;
+            const remaining = item.remaining || 0;
+            const unit = item.unit || 'pc';
             
-            receiptNumberField.value = receiptNumber;
-          });
-      }
-      
-      // Toast notifications
-      @if(session('success'))
-      showToast('{{ session('success') }}', 'success');
-      @endif
-      
-      @if(session('error'))
-      showToast('{{ session('error') }}', 'danger');
-      @endif
-      
-      // Confirm before submitting delete forms
-      document.querySelectorAll('form[action*="destroy"]').forEach(form => {
-        form.addEventListener('submit', function(e) {
-          if (!confirm('Are you absolutely sure you want to delete this receipt? This action cannot be undone.')) {
-            e.preventDefault();
-          }
+            html += `
+                <div class="item-row mb-3 p-2 border rounded">
+                    <div class="row g-2">
+                        <div class="col-md-5">
+                            <input type="text" class="form-control form-control-sm" 
+                                   value="${description}" readonly>
+                            <input type="hidden" name="items[${index}][description]" value="${description}">
+                            <input type="hidden" name="items[${index}][price]" value="${price}">
+                            <input type="hidden" name="items[${index}][unit]" value="${unit}">
+                            <input type="hidden" name="items[${index}][quantity_ordered]" value="${quantityOrdered}">
+                        </div>
+                        <div class="col-md-2">
+                            <input type="number" class="form-control form-control-sm" 
+                                   value="${quantityOrdered}" readonly>
+                        </div>
+                        <div class="col-md-2">
+                            <input type="number" class="form-control form-control-sm receipt-quantity" 
+                                   name="items[${index}][quantity_received]" 
+                                   min="0" 
+                                   max="${remaining}"
+                                   value="0" 
+                                   data-price="${price}"
+                                   required
+                                   oninput="calculateTotal()">
+                        </div>
+                        <div class="col-md-2">
+                            <input type="text" class="form-control form-control-sm" value="${unit}" readonly>
+                        </div>
+                        <div class="col-md-1">
+                            <span class="badge badge-sm bg-info">Max: ${remaining}</span>
+                        </div>
+                    </div>
+                    <div class="row mt-1">
+                        <div class="col-md-12">
+                            <small class="text-muted">
+                                Price: Tsh${price.toFixed(2)} | 
+                                Total: <span id="item-total-${index}">Tsh0.00</span>
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            `;
         });
-      });
+    }
+    
+    container.innerHTML = html;
+    calculateTotal();
+}
+    // Calculate totals
+    function calculateTotal() {
+        let totalQuantity = 0;
+        let totalAmount = 0;
+        
+        // Calculate each item
+        document.querySelectorAll('.receipt-quantity').forEach((input, index) => {
+            const quantity = parseFloat(input.value) || 0;
+            const price = parseFloat(input.dataset.price) || 0;
+            const itemTotal = quantity * price;
+            
+            // Update item total display
+            const itemTotalElement = document.getElementById(`item-total-${index}`);
+            if (itemTotalElement) {
+                itemTotalElement.textContent = `Tsh${itemTotal.toFixed(2)}`;
+            }
+            
+            totalQuantity += quantity;
+            totalAmount += itemTotal;
+        });
+        
+        // Update summary
+        document.getElementById('total-received-summary').value = 
+            `${totalQuantity} units / Tsh${totalAmount.toFixed(2)}`;
+    }
+    
+    // Toggle return reason
+    function toggleReturnReason(show) {
+        const section = document.getElementById('return-reason-section');
+        const textarea = section.querySelector('textarea');
+        section.classList.toggle('d-none', !show);
+        if (show) {
+            textarea.setAttribute('required', 'required');
+        } else {
+            textarea.removeAttribute('required');
+        }
+    }
+    
+    // Generate receipt number on modal open
+    document.getElementById('createReceiptModal').addEventListener('show.bs.modal', function() {
+        fetch('{{ route("admin.receipt.generate") }}')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('receipt_number').value = data.receipt_number;
+            })
+            .catch(() => {
+                // Fallback if API fails
+                const date = new Date();
+                const random = Math.floor(Math.random() * 10000);
+                document.getElementById('receipt_number').value = `RC-${date.getFullYear()}${String(date.getMonth()+1).padStart(2,'0')}${String(date.getDate()).padStart(2,'0')}-${random}`;
+            });
     });
     
-    function showToast(message, type = 'info') {
-      const toast = document.createElement('div');
-      toast.className = `toast align-items-center text-white bg-${type}`;
-      toast.innerHTML = `
-        <div class="d-flex">
-          <div class="toast-body">${message}</div>
-          <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-        </div>
-      `;
-      
-      const container = document.getElementById('toast-container') || (() => {
-        const div = document.createElement('div');
-        div.id = 'toast-container';
-        div.className = 'toast-container position-fixed top-0 end-0 p-3';
-        document.body.appendChild(div);
-        return div;
-      })();
-      
-      container.appendChild(toast);
-      const bsToast = new bootstrap.Toast(toast, { delay: 3000 });
-      bsToast.show();
+    // Show success/error messages
+    @if(session('success'))
+    showToast('{{ session('success') }}', 'success');
+    @endif
+    
+    @if(session('error'))
+    showToast('{{ session('error') }}', 'danger');
+    @endif
+    
+    function showToast(message, type) {
+        const toast = document.createElement('div');
+        toast.className = `toast align-items-center text-white bg-${type} border-0`;
+        toast.setAttribute('role', 'alert');
+        toast.setAttribute('aria-live', 'assertive');
+        toast.setAttribute('aria-atomic', 'true');
+        toast.innerHTML = `
+            <div class="d-flex">
+                <div class="toast-body">${message}</div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+            </div>
+        `;
+        
+        const container = document.getElementById('toast-container') || (() => {
+            const div = document.createElement('div');
+            div.id = 'toast-container';
+            div.className = 'toast-container position-fixed top-0 end-0 p-3';
+            document.body.appendChild(div);
+            return div;
+        })();
+        
+        container.appendChild(toast);
+        const bsToast = new bootstrap.Toast(toast, { delay: 3000 });
+        bsToast.show();
     }
   </script>
 </body>

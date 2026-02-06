@@ -162,7 +162,8 @@ Route::prefix('purchase-orders')->name('purchase-order.')->group(function () {
         Route::get('admin/company/{id}', [AdminCompanyController::class, 'show'])->name('show');
         
         // Update Company
-        Route::put('admin/company/{id}', [AdminCompanyController::class, 'update'])->name('update');
+        Route::put('/admin/company/{id}', [AdminCompanyController::class, 'update'])->name('update');
+
         
         // Delete Company
         Route::delete('admin/company/{id}', [AdminCompanyController::class, 'destroy'])->name('destroy');
@@ -175,33 +176,29 @@ Route::prefix('purchase-orders')->name('purchase-order.')->group(function () {
 
 
     /*
-    |--------------------------------------------------------------------------
-    | Receipt Routes
-    |--------------------------------------------------------------------------
-    */
-    Route::prefix('receipts')->name('receipt.')->group(function () {
-        Route::get('/', [AdminReceiptController::class, 'index'])->name('index');
-        Route::get('create', [AdminReceiptController::class, 'create'])->name('create');
-        Route::post('/', [AdminReceiptController::class, 'store'])->name('store');
-        Route::get('{receipt}', [AdminReceiptController::class, 'show'])->name('show');
-        Route::get('{receipt}/edit', [AdminReceiptController::class, 'edit'])->name('edit');
-        Route::put('{receipt}', [AdminReceiptController::class, 'update'])->name('update');
-        Route::delete('{receipt}', [AdminReceiptController::class, 'destroy'])->name('destroy');
-        
-        // Status management
-        Route::post('{receipt}/status', [AdminReceiptController::class, 'updateStatus'])->name('status.update');
-        Route::post('{receipt}/complete', [AdminReceiptController::class, 'markAsCompleted'])->name('complete');
-        
-        // PDF
-        Route::get('{receipt}/download', [AdminReceiptController::class, 'download'])->name('download');
-        Route::get('{receipt}/print', [AdminReceiptController::class, 'print'])->name('print');
-        
-        // AJAX
-        Route::get('generate-number', [AdminReceiptController::class, 'generateNumber'])->name('generate');
-        Route::get('purchase-order/{id}/details', [AdminReceiptController::class, 'getPurchaseOrderDetails'])->name('po.details');
-        Route::get('purchase-order/{id}/receipts', [AdminReceiptController::class, 'getPOReceipts'])->name('po.receipts');
-    });
+|--------------------------------------------------------------------------
+| Receipt Routes (Admin)
+|--------------------------------------------------------------------------
+*/
+Route::prefix('receipts')->name('receipt.')->group(function () {
+    Route::get('/', [AdminReceiptController::class, 'index'])->name('index');
+    Route::get('create', [AdminReceiptController::class, 'create'])->name('create');
+    Route::post('/', [AdminReceiptController::class, 'store'])->name('store');
+    Route::get('{receipt}', [AdminReceiptController::class, 'show'])->name('show');
+    Route::get('{receipt}/edit', [AdminReceiptController::class, 'edit'])->name('edit');
+    Route::put('{receipt}', [AdminReceiptController::class, 'update'])->name('update');
+    Route::delete('{receipt}', [AdminReceiptController::class, 'destroy'])->name('destroy');
+    
+    Route::post('{receipt}/status', [AdminReceiptController::class, 'updateStatus'])->name('status.update');
+    
+    // PDF download
+    Route::get('{receipt}/download', [AdminReceiptController::class, 'download'])->name('download');
+    Route::get('{receipt}/print', [AdminReceiptController::class, 'print'])->name('print');
+    
 
+    Route::get('generate-number', [AdminReceiptController::class, 'generateNumber'])->name('generate');
+    Route::get('purchase-order/{id}/details', [AdminReceiptController::class, 'getPurchaseOrderDetails'])->name('po.details');
+});
     /*
     |--------------------------------------------------------------------------
     | Setting Routes
@@ -405,4 +402,6 @@ Route::post('/company/logout', [ConfirmablePasswordController::class, 'logout'])
     ->name('company.logout')
     ->middleware('auth:company');  // Only authenticated companies can logout
 
+
+    Route::get('/debug/receipt/{id}', [AdminReceiptController::class, 'debugReceipt']);
 require __DIR__.'/auth.php';

@@ -6,75 +6,78 @@ use App\Http\Controllers\Controller;
 use App\Models\Receipt;
 use App\Models\PurchaseOrder;
 use App\Models\Company;
-use App\Models\User;
 use Illuminate\Http\Request;
-use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Auth;
 
 class AdminReceiptController extends Controller
 {
-      /**
+    protected $guard = 'company';
+
+    /**
      * Display all receipts
      */
-   public function index()
-{
-    $companyId = Auth::guard('company')->id();
-    $company = Company::find($companyId);
-    
-    // Get receipts
-    $receipts = Receipt::with('purchaseOrder')
-        ->orderBy('created_at', 'desc')
-        ->paginate(15);
-    
-    // Get ALL POs for debugging - remove filters temporarily
-    $allPOs = PurchaseOrder::get();
-    
-    // Get POs for the create modal dropdown
-    $purchaseOrders = PurchaseOrder::orderBy('po_date', 'desc')
-        ->get();
-    
-    $stats = [
-        'total' => Receipt::count(),
-        'draft' => Receipt::where('status', 'draft')->count(),
-        'completed' => Receipt::where('status', 'completed')->count(),
-        'verified' => Receipt::where('status', 'verified')->count(),
-        'partial' => Receipt::where('status', 'partial')->count(),
-        'total_value' => Receipt::sum('total_amount'),
-    ];
-    
-    // Debug information
-    $debugInfo = [
-        'company_id' => $companyId,
-        'all_po_count' => $allPOs->count(),
-        'all_po_statuses' => $allPOs->pluck('status')->unique()->toArray(),
-        'filtered_po_count' => $purchaseOrders->count(),
-        'filtered_po_numbers' => $purchaseOrders->pluck('po_number')->toArray(),
-    ];
-    
-    \Log::info('Receipt Index Debug:', $debugInfo);
-    
-    return view('admin.receipt.index', compact('receipts', 'company', 'stats', 'purchaseOrders', 'debugInfo'));
-}
+    public function index()
+    {
+        $companyId = auth()->guard($this->guard)->id();
+        
+        $receipts = Receipt::where('company_id', $companyId)
+            ->with('purchaseOrder')
+            ->orderBy('created_at', 'desc')
+            ->paginate(15);
+        
+        // Get only eligible purchase orders (not fully received yet)
+        $purchaseOrders = PurchaseOrder::where('company_id', $companyId)
+            ->whereIn('status', ['approved', 'ordered'])
+            ->with('receipts') // Eager load receipts for calculation
+            ->orderBy('po_date', 'desc')
+            ->get()
+            ->filter(function($po) {
+                // Filter out fully received POs
+                $totalReceived = $po->receipts
+                    ->where('status', '!=', 'cancelled')
+                    ->sum('total_quantity_received');
+                $totalOrdered = $po->total_quantity_ordered;
+                
+                return $totalReceived < $totalOrdered;
+            });
+        
+        $stats = [
+            'total' => Receipt::where('company_id', $companyId)->count(),
+            'draft' => Receipt::where('company_id', $companyId)->where('status', 'draft')->count(),
+            'completed' => Receipt::where('company_id', $companyId)->where('status', 'completed')->count(),
+            'verified' => Receipt::where('company_id', $companyId)->where('status', 'verified')->count(),
+            'partial' => Receipt::where('company_id', $companyId)->where('status', 'partial')->count(),
+            'total_value' => Receipt::where('company_id', $companyId)->sum('total_amount'),
+        ];
+        
+        return view('admin.receipt.index', compact('receipts', 'stats', 'purchaseOrders'));
+    }
+
     /**
      * Show form to create new receipt
      */
     public function create()
     {
-        $companyId = Auth::guard('company')->id();
+        $companyId = auth()->guard($this->guard)->id();
         
-        // Get POs that can receive goods
+        // Get only eligible purchase orders
         $purchaseOrders = PurchaseOrder::where('company_id', $companyId)
             ->whereIn('status', ['approved', 'ordered'])
-            ->where(function($query) {
-                $query->where('receipt_status', 'not_received')
-                      ->orWhere('receipt_status', 'partial');
-            })
+            ->with('receipts')
             ->orderBy('po_date', 'desc')
-            ->get();
+            ->get()
+            ->filter(function($po) {
+                $totalReceived = $po->receipts
+                    ->where('status', '!=', 'cancelled')
+                    ->sum('total_quantity_received');
+                $totalOrdered = $po->total_quantity_ordered;
+                
+                return $totalReceived < $totalOrdered;
+            });
         
         $receiptNumber = Receipt::generateReceiptNumber($companyId);
         
-        return view('company.receipt.create', compact('purchaseOrders', 'receiptNumber'));
+        return view('admin.receipt.create', compact('purchaseOrders', 'receiptNumber'));
     }
 
     /**
@@ -82,25 +85,42 @@ class AdminReceiptController extends Controller
      */
     public function getPurchaseOrderDetails($id)
     {
-        $po = PurchaseOrder::with('receipts')->findOrFail($id);
+        $companyId = auth()->guard($this->guard)->id();
+        $po = PurchaseOrder::where('company_id', $companyId)
+            ->with(['receipts' => function($query) {
+                $query->where('status', '!=', 'cancelled');
+            }])
+            ->findOrFail($id);
         
-        // Calculate remaining quantities
+        // Check if PO is eligible
+        $totalReceived = $po->receipts->sum('total_quantity_received');
+        $totalOrdered = $po->total_quantity_ordered;
+        
+        if ($totalReceived >= $totalOrdered) {
+            return response()->json([
+                'error' => 'This purchase order has been fully received.',
+                'fully_received' => true
+            ], 400);
+        }
+        
+        // Get PO items
         $items = $po->formatted_items;
-        $receipts = $po->receipts()->where('status', '!=', 'cancelled')->get();
         
         // Calculate received quantities for each item
         foreach ($items as &$item) {
             $item['quantity_ordered'] = $item['quantity'] ?? 0;
             $item['quantity_received'] = 0;
             $item['remaining'] = $item['quantity_ordered'];
+            $item['price'] = $item['price'] ?? 0;
+            $item['unit'] = $item['unit'] ?? 'pcs';
         }
         
-        // Subtract already received quantities
-        foreach ($receipts as $receipt) {
-            $receiptItems = $receipt->formatted_items;
+        // Subtract already received quantities from all receipts
+        foreach ($po->receipts as $receipt) {
+            $receiptItems = $receipt->items;
             foreach ($receiptItems as $receiptItem) {
                 foreach ($items as &$item) {
-                    if ($item['description'] == $receiptItem['description']) {
+                    if (($item['description'] ?? '') == ($receiptItem['description'] ?? '')) {
                         $item['quantity_received'] += $receiptItem['quantity_received'] ?? 0;
                         $item['remaining'] = $item['quantity_ordered'] - $item['quantity_received'];
                     }
@@ -112,8 +132,9 @@ class AdminReceiptController extends Controller
             'po' => $po,
             'items' => $items,
             'total_ordered' => $po->total_quantity_ordered,
-            'total_received' => $po->total_quantity_received,
-            'remaining' => $po->remaining_quantity
+            'total_received' => $totalReceived,
+            'remaining' => $po->total_quantity_ordered - $totalReceived,
+            'is_eligible' => true
         ]);
     }
 
@@ -122,86 +143,77 @@ class AdminReceiptController extends Controller
      */
     public function store(Request $request)
     {
+        $companyId = auth()->guard($this->guard)->id();
         
-
+        // Simple validation
         $request->validate([
-            'receipt_number' => 'required|string|max:100',
+            'receipt_number' => 'required|string|max:100|unique:receipts,receipt_number',
             'purchase_order_id' => 'required|exists:purchase_orders,id',
             'receipt_date' => 'required|date',
             'receipt_type' => 'required|in:full_delivery,partial_delivery,return,damaged_goods',
-            'items' => 'required|array',
-            'items.*.description' => 'required|string',
-            'items.*.quantity_ordered' => 'required|numeric|min:0',
-            'items.*.quantity_received' => 'required|numeric|min:0',
-            'items.*.price' => 'required|numeric|min:0',
-            'items.*.unit' => 'nullable|string',
-            'delivery_note_number' => 'nullable|string|max:100',
-            'vehicle_number' => 'nullable|string|max:50',
-            'driver_name' => 'nullable|string|max:100',
-            'driver_contact' => 'nullable|string|max:20',
-            'condition' => 'required|in:excellent,good,fair,poor,damaged',
-            'quality_notes' => 'nullable|string',
-            'storage_location' => 'nullable|string|max:100',
-            'bin_location' => 'nullable|string|max:50',
-            'notes' => 'nullable|string',
-            'return_reason' => 'nullable|string|required_if:receipt_type,return'
+            'items' => 'required|array|min:1',
+            'items.*.quantity_received' => 'required|numeric|min:0'
         ]);
 
-        $companyId = Auth::guard('company')->id();
-        $po = PurchaseOrder::findOrFail($request->purchase_order_id);
+        // Get PO and check eligibility
+        $po = PurchaseOrder::where('company_id', $companyId)
+            ->with(['receipts' => function($query) {
+                $query->where('status', '!=', 'cancelled');
+            }])
+            ->findOrFail($request->purchase_order_id);
         
-        // Validate quantities don't exceed ordered amounts
-        foreach ($request->items as $item) {
-            $quantityOrdered = floatval($item['quantity_ordered'] ?? 0);
-            $quantityReceived = floatval($item['quantity_received'] ?? 0);
-            
-            if ($quantityReceived > $quantityOrdered && $request->receipt_type != 'return') {
-                return redirect()->back()
-                    ->withInput()
-                    ->with('error', "Quantity received cannot exceed quantity ordered for item: {$item['description']}");
-            }
+        // Check if PO is still eligible
+        $totalReceived = $po->receipts->sum('total_quantity_received');
+        $totalOrdered = $po->total_quantity_ordered;
+        
+        if ($totalReceived >= $totalOrdered) {
+            return redirect()->back()
+                ->withInput()
+                ->with('error', 'This purchase order has been fully received. Cannot create new receipt.');
         }
         
         // Calculate totals
-        $totals = Receipt::calculateTotals($request->items);
+        $totalItems = count($request->items);
+        $totalQuantity = 0;
+        $totalAmount = 0;
         
-        // Determine status based on receipt type
-        $status = 'draft';
-        if ($request->receipt_type == 'return' || $request->receipt_type == 'damaged_goods') {
-            $status = 'completed';
+        foreach ($request->items as $item) {
+            $quantity = floatval($item['quantity_received'] ?? 0);
+            $price = floatval($item['price'] ?? 0);
+            
+            $totalQuantity += $quantity;
+            $totalAmount += ($quantity * $price);
         }
         
+        // Create receipt
         $receipt = Receipt::create([
-        'company_id' => $companyId,
-        'receipt_number' => $request->receipt_number,
-        'purchase_order_id' => $request->purchase_order_id,
-        'receipt_date' => $request->receipt_date,
-        'received_by' => 1,
-        'received_by_name' => Auth::user()->name,
-        'supplier_name' => $po->supplier_name,
-        'supplier_contact_person' => $po->supplier_contact_person,
-        'items' => $request->items,
-        'total_items_received' => $totals['total_items'],
-        'total_quantity_received' => $totals['total_quantity'],
-        'total_amount' => $totals['total_amount'],
-        'status' => $status,
-        'receipt_type' => $request->receipt_type,
-        'delivery_note_number' => $request->delivery_note_number,
-        'vehicle_number' => $request->vehicle_number,
-        'driver_name' => $request->driver_name,
-        'driver_contact' => $request->driver_contact,
-        'condition' => $request->condition,
-        'quality_notes' => $request->quality_notes,
-        'storage_location' => $request->storage_location,
-        'bin_location' => $request->bin_location,
-        'notes' => $request->notes,
-        'return_reason' => $request->return_reason,
-    ]);
+            'company_id' => $companyId,
+            'receipt_number' => $request->receipt_number,
+            'purchase_order_id' => $request->purchase_order_id,
+            'receipt_date' => $request->receipt_date,
+            'received_by' => Auth::id(),
+            'received_by_name' => Auth::user()->name,
+            'supplier_name' => $po->supplier_name,
+            'supplier_contact_person' => $po->supplier_contact_person,
+            'items' => $request->items,
+            'total_items_received' => $totalItems,
+            'total_quantity_received' => $totalQuantity,
+            'total_amount' => $totalAmount,
+            'status' => 'draft',
+            'receipt_type' => $request->receipt_type,
+            'delivery_note_number' => $request->delivery_note_number,
+            'vehicle_number' => $request->vehicle_number,
+            'driver_name' => $request->driver_name,
+            'driver_contact' => $request->driver_contact,
+            'condition' => $request->condition ?? 'good',
+            'quality_notes' => $request->quality_notes,
+            'storage_location' => $request->storage_location,
+            'bin_location' => $request->bin_location,
+            'notes' => $request->notes,
+            'return_reason' => $request->return_reason,
+        ]);
 
-        // Update PO receipt status
-        $receipt->updatePurchaseOrderStatus();
-
-        return redirect()->route('company.receipt.index')
+        return redirect()->route('admin.receipt.index')
             ->with('success', 'Receipt created successfully!');
     }
 
@@ -210,8 +222,9 @@ class AdminReceiptController extends Controller
      */
     public function show(Receipt $receipt)
     {
-        $receipt->load('purchaseOrder', 'receiver', 'verifier');
-        return view('company.receipt.show', compact('receipt'));
+        $this->checkAccess($receipt);
+        $receipt->load('purchaseOrder');
+        return view('admin.receipt.show', compact('receipt'));
     }
 
     /**
@@ -219,13 +232,14 @@ class AdminReceiptController extends Controller
      */
     public function edit(Receipt $receipt)
     {
-        if (!$receipt->can_edit) {
-            return redirect()->route('company.receipt.index')
-                ->with('error', 'This receipt cannot be edited.');
+        $this->checkAccess($receipt);
+        
+        if ($receipt->status !== 'draft') {
+            return redirect()->route('admin.receipt.index')
+                ->with('error', 'Only draft receipts can be edited.');
         }
         
-        $receipt->load('purchaseOrder');
-        return view('company.receipt.edit', compact('receipt'));
+        return view('admin.receipt.edit', compact('receipt'));
     }
 
     /**
@@ -233,55 +247,39 @@ class AdminReceiptController extends Controller
      */
     public function update(Request $request, Receipt $receipt)
     {
-        if (!$receipt->can_edit) {
-            return redirect()->route('company.receipt.index')
-                ->with('error', 'This receipt cannot be edited.');
+        $this->checkAccess($receipt);
+        
+        if ($receipt->status !== 'draft') {
+            return redirect()->route('admin.receipt.index')
+                ->with('error', 'Only draft receipts can be edited.');
         }
         
         $request->validate([
             'receipt_date' => 'required|date',
             'receipt_type' => 'required|in:full_delivery,partial_delivery,return,damaged_goods',
-            'items' => 'required|array',
-            'items.*.description' => 'required|string',
-            'items.*.quantity_ordered' => 'required|numeric|min:0',
-            'items.*.quantity_received' => 'required|numeric|min:0',
-            'items.*.price' => 'required|numeric|min:0',
-            'items.*.unit' => 'nullable|string',
-            'delivery_note_number' => 'nullable|string|max:100',
-            'vehicle_number' => 'nullable|string|max:50',
-            'driver_name' => 'nullable|string|max:100',
-            'driver_contact' => 'nullable|string|max:20',
-            'condition' => 'required|in:excellent,good,fair,poor,damaged',
-            'quality_notes' => 'nullable|string',
-            'storage_location' => 'nullable|string|max:100',
-            'bin_location' => 'nullable|string|max:50',
-            'notes' => 'nullable|string',
-            'return_reason' => 'nullable|string|required_if:receipt_type,return'
+            'items' => 'required|array|min:1',
+            'items.*.quantity_received' => 'required|numeric|min:0'
         ]);
         
-        $po = $receipt->purchaseOrder;
-        
-        // Validate quantities
-        foreach ($request->items as $item) {
-            $quantityOrdered = floatval($item['quantity_ordered'] ?? 0);
-            $quantityReceived = floatval($item['quantity_received'] ?? 0);
-            
-            if ($quantityReceived > $quantityOrdered && $request->receipt_type != 'return') {
-                return redirect()->back()
-                    ->withInput()
-                    ->with('error', "Quantity received cannot exceed quantity ordered for item: {$item['description']}");
-            }
-        }
-        
         // Calculate totals
-        $totals = Receipt::calculateTotals($request->items);
+        $totalItems = count($request->items);
+        $totalQuantity = 0;
+        $totalAmount = 0;
+        
+        foreach ($request->items as $item) {
+            $quantity = floatval($item['quantity_received'] ?? 0);
+            $price = floatval($item['price'] ?? 0);
+            
+            $totalQuantity += $quantity;
+            $totalAmount += ($quantity * $price);
+        }
         
         $receipt->update([
             'receipt_date' => $request->receipt_date,
-            'items' => json_encode($request->items),
-            'total_items_received' => $totals['total_items'],
-            'total_quantity_received' => $totals['total_quantity'],
-            'total_amount' => $totals['total_amount'],
+            'items' => $request->items,
+            'total_items_received' => $totalItems,
+            'total_quantity_received' => $totalQuantity,
+            'total_amount' => $totalAmount,
             'receipt_type' => $request->receipt_type,
             'delivery_note_number' => $request->delivery_note_number,
             'vehicle_number' => $request->vehicle_number,
@@ -292,13 +290,9 @@ class AdminReceiptController extends Controller
             'storage_location' => $request->storage_location,
             'bin_location' => $request->bin_location,
             'notes' => $request->notes,
-            'return_reason' => $request->return_reason
         ]);
         
-        // Update PO receipt status
-        $receipt->updatePurchaseOrderStatus();
-
-        return redirect()->route('company.receipt.index')
+        return redirect()->route('admin.receipt.index')
             ->with('success', 'Receipt updated successfully!');
     }
 
@@ -307,83 +301,43 @@ class AdminReceiptController extends Controller
      */
     public function updateStatus(Request $request, Receipt $receipt)
     {
+        $this->checkAccess($receipt);
+        
         $request->validate([
             'status' => 'required|in:completed,verified,cancelled'
         ]);
         
-        $status = $request->status;
+        $receipt->update([
+            'status' => $request->status,
+            'verification_notes' => $request->verification_notes,
+            'verified_by' => $request->status === 'verified' ? Auth::id() : null,
+            'verified_at' => $request->status === 'verified' ? now() : null,
+        ]);
         
-        if ($status === 'verified' && !$receipt->can_verify) {
-            return redirect()->back()
-                ->with('error', 'Receipt must be completed before verification.');
-        }
-        
-        $updates = ['status' => $status];
-        
-        // If verifying, record verifier info
-        if ($status === 'verified') {
-            $updates['verified_by'] = Auth::id();
-            $updates['verified_at'] = now();
-        }
-        
-        $receipt->update($updates);
-        
-        // Update PO receipt status if cancelled
-        if ($status === 'cancelled') {
-            $receipt->updatePurchaseOrderStatus();
-        }
-
         return redirect()->back()
-            ->with('success', "Receipt status updated to " . ucfirst($status));
+            ->with('success', 'Receipt status updated successfully!');
     }
 
     /**
      * Delete receipt
      */
-    public function destroy(Receipt $receipt)
+    public function destroy(Request $request, Receipt $receipt)
     {
-        if (!$receipt->can_delete) {
-            return redirect()->route('company.receipt.index')
-                ->with('error', 'This receipt cannot be deleted.');
+        $this->checkAccess($receipt);
+        
+        if ($receipt->status !== 'draft') {
+            return redirect()->route('admin.receipt.index')
+                ->with('error', 'Only draft receipts can be deleted.');
         }
         
-        $po = $receipt->purchaseOrder;
+        $request->validate([
+            'delete_reason' => 'required|string|min:5'
+        ]);
+        
         $receipt->delete();
         
-        // Update PO receipt status
-        $receipt->updatePurchaseOrderStatus();
-
-        return redirect()->route('company.receipt.index')
+        return redirect()->route('admin.receipt.index')
             ->with('success', 'Receipt deleted successfully!');
-    }
-
-    /**
-     * Download PDF
-     */
-    public function download(Receipt $receipt)
-    {
-        $company = Company::find($receipt->company_id);
-        $receipt->load('purchaseOrder', 'receiver', 'verifier');
-        
-        $pdf = PDF::loadView('admin.receipt.pdf', compact('receipt', 'company'))
-            ->setPaper('a4', 'portrait');
-
-        $filename = 'receipt-' . preg_replace('/[^A-Za-z0-9\-]/', '_', $receipt->receipt_number) . '.pdf';
-
-        return $pdf->download($filename);
-    }
-
-    /**
-     * View PDF in browser
-     */
-    public function print(Receipt $receipt)
-    {
-        $company = Company::find($receipt->company_id);
-        $receipt->load('purchaseOrder', 'receiver', 'verifier');
-        
-        $pdf = PDF::loadView('company.receipt.pdf', compact('receipt', 'company'));
-        
-        return $pdf->stream('receipt-' . $receipt->receipt_number . '.pdf');
     }
 
     /**
@@ -391,38 +345,86 @@ class AdminReceiptController extends Controller
      */
     public function generateNumber()
     {
-        $companyId = auth()->user()->company_id ?? 1;
+        $companyId = auth()->guard($this->guard)->id();
         $number = Receipt::generateReceiptNumber($companyId);
         
         return response()->json(['receipt_number' => $number]);
     }
 
     /**
-     * Get receipts for a specific PO
+     * Download PDF
      */
-    public function getPOReceipts($poId)
+    public function download(Receipt $receipt)
     {
-        $receipts = Receipt::where('purchase_order_id', $poId)
-            ->orderBy('receipt_date', 'desc')
-            ->get();
-            
-        return response()->json($receipts);
+        $this->checkAccess($receipt);
+        
+        // For now, just redirect back - add PDF later
+        return redirect()->back()
+            ->with('info', 'PDF download will be available soon');
     }
 
     /**
-     * Mark receipt as completed
+     * Print/View PDF
      */
-    public function markAsCompleted(Receipt $receipt)
+    public function print(Receipt $receipt)
     {
-        if ($receipt->status !== 'draft') {
-            return redirect()->back()
-                ->with('error', 'Only draft receipts can be marked as completed.');
-        }
+        $this->checkAccess($receipt);
         
-        $receipt->update(['status' => 'completed']);
-        $receipt->updatePurchaseOrderStatus();
-
-        return redirect()->back()
-            ->with('success', 'Receipt marked as completed.');
+        // For now, just show the receipt
+        return $this->show($receipt);
     }
+
+    /**
+     * Check access
+     */
+    private function checkAccess(Receipt $receipt)
+    {
+        $companyId = auth()->guard($this->guard)->id();
+        
+        if ($receipt->company_id != $companyId) {
+            abort(403, 'Unauthorized access.');
+        }
+    }
+
+    // Add this method to your controller
+public function debugReceipt($id)
+{
+    $receipt = Receipt::find($id);
+    
+    if (!$receipt) {
+        return response()->json(['error' => 'Receipt not found'], 404);
+    }
+    
+    // Calculate what total should be
+    $calculatedTotal = 0;
+    $items = $receipt->items ?? [];
+    
+    foreach ($items as $index => $item) {
+        $quantity = floatval($item['quantity_received'] ?? 0);
+        $price = floatval($item['price'] ?? 0);
+        $itemTotal = $quantity * $price;
+        $calculatedTotal += $itemTotal;
+        
+        $items[$index]['calculated_total'] = $itemTotal;
+        $items[$index]['has_price'] = isset($item['price']);
+        $items[$index]['price_type'] = gettype($item['price'] ?? 'null');
+    }
+    
+    return response()->json([
+        'receipt' => [
+            'id' => $receipt->id,
+            'receipt_number' => $receipt->receipt_number,
+            'stored_total_amount' => $receipt->total_amount,
+            'stored_total_amount_type' => gettype($receipt->total_amount),
+            'calculated_total_amount' => $calculatedTotal,
+            'difference' => $calculatedTotal - $receipt->total_amount,
+            'items_count' => count($items),
+        ],
+        'items_analysis' => $items,
+        'calculation_details' => [
+            'method' => 'sum(quantity_received * price) for each item',
+            'items_processed' => count($items),
+        ]
+    ]);
+}
 }

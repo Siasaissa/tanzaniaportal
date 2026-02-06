@@ -643,6 +643,9 @@
           <form action="{{ route('admin.purchase-order.update', $po) }}" method="POST">
             @csrf
             @method('PUT')
+            <input type="hidden" name="supplier_name" value="{{ $po->supplier_name }}">
+            <input type="hidden" name="payment_terms" value="{{ $po->payment_terms }}">
+
             <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
               <div class="row g-2">
                 <div class="col-md-6">

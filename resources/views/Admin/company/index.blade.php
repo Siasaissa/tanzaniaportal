@@ -573,59 +573,39 @@
                     confirmPassword.addEventListener('input', validatePasswords);
                 }
             });
+            
+            // Toast notifications
+            @if(session('success'))
+            showToast('{{ session('success') }}', 'success');
+            @endif
+            
+            @if(session('error'))
+            showToast('{{ session('error') }}', 'danger');
+            @endif
         });
-
         
-    </script>
-    <script>
-document.addEventListener('DOMContentLoaded', function () {
-
-    // ===== YOUR EXISTING JS STAYS HERE =====
-
-
-    // ===== TOAST FUNCTION =====
-    function showToast(message, type = 'success') {
-
-        let container = document.getElementById('toast-container');
-
-        if (!container) {
-            container = document.createElement('div');
-            container.id = 'toast-container';
-            container.className = 'toast-container position-fixed top-0 end-0 p-3';
-            container.style.zIndex = '9999';
-            document.body.appendChild(container);
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            toast.className = `toast align-items-center text-white bg-${type}`;
+            toast.innerHTML = `
+                <div class="d-flex">
+                    <div class="toast-body">${message}</div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                </div>
+            `;
+            
+            const container = document.getElementById('toast-container') || (() => {
+                const div = document.createElement('div');
+                div.id = 'toast-container';
+                div.className = 'toast-container position-fixed top-0 end-0 p-3';
+                document.body.appendChild(div);
+                return div;
+            })();
+            
+            container.appendChild(toast);
+            const bsToast = new bootstrap.Toast(toast, { delay: 3000 });
+            bsToast.show();
         }
-
-        const toast = document.createElement('div');
-        toast.className = `toast align-items-center text-white bg-${type} border-0`;
-        toast.innerHTML = `
-            <div class="d-flex">
-                <div class="toast-body">${message}</div>
-                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-            </div>
-        `;
-
-        container.appendChild(toast);
-
-        const bsToast = new bootstrap.Toast(toast, {
-            delay: 3000
-        });
-
-        bsToast.show();
-    }
-
-
-    // ===== SESSION TOASTS =====
-    @if(session('success'))
-        showToast("{{ session('success') }}", "success");
-    @endif
-
-    @if(session('error'))
-        showToast("{{ session('error') }}", "danger");
-    @endif
-
-});
-</script>
-
+    </script>
 </body>
 </html>

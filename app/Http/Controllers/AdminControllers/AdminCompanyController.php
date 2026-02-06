@@ -48,39 +48,45 @@ class AdminCompanyController extends Controller
      * Update the specified company.
      */
     public function update(Request $request, Company $company)
-    {
-        //dd($request->all());
+{
+    $request->validate([
+        'name'         => 'required|string|max:255',
+        'email'        => 'required|email|max:255',
+        'phone'        => 'nullable|string|max:20',
+        'provider'     => 'nullable|string|max:50',
+        'status'       => 'required|in:active,inactive,pending',
+        'company_desc' => 'nullable|string|max:2000',
+        'logo'         => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+        'password'     => 'nullable|string|min:8|confirmed',
+    ]);
 
-        $request->validate([
-            'name' => 'required|string|max:255|unique:companies,name,' . $company->id,
-            'email' => 'required|string|email|max:255|unique:companies,email,' . $company->id,
-            'phone' => 'nullable|string|max:20',
-            'logo' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-            'company_desc' => 'nullable|string|max:2000',
-            'password' => 'nullable|string|min:8|confirmed',
-            'status' => 'required|in:active,inactive,pending',
-            'provider' => 'nullable|string|max:50',
-        ]);
+    // update normal fields
+    $company->fill($request->except(['logo', 'password', 'remove_logo']));
 
-        $company->fill($request->except(['logo', 'password']));
-        
-        if ($request->filled('password')) {
-            $company->password = Hash::make($request->password);
-        }
-        
-        if ($request->hasFile('logo')) {
-            if ($company->logo) {
-                Storage::disk('public')->delete($company->logo);
-            }
-            $path = $request->file('logo')->store('companies/logos', 'public');
-            $company->logo = $path;
-        }
-        
-        $company->save();
-        
-        return redirect()->route('admin.company.index')
-            ->with('success', 'Company updated successfully.');
+    // update password only if entered
+    if ($request->filled('password')) {
+        $company->password = Hash::make($request->password);
     }
+
+    // remove logo if checked
+    if ($request->remove_logo && $company->logo) {
+        Storage::disk('public')->delete($company->logo);
+        $company->logo = null;
+    }
+
+    // upload new logo
+    if ($request->hasFile('logo')) {
+        if ($company->logo) {
+            Storage::disk('public')->delete($company->logo);
+        }
+        $company->logo = $request->file('logo')->store('companies/logos', 'public');
+    }
+
+    $company->save();
+
+    return redirect()->route('admin.company.index')
+        ->with('success', 'Company updated successfully.');
+}
 
     /**
      * Remove the specified company.
