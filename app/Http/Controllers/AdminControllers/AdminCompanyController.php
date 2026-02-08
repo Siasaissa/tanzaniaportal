@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use App\Models\Company;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 
 class AdminCompanyController extends Controller
 {
@@ -49,9 +50,15 @@ class AdminCompanyController extends Controller
      */
     public function update(Request $request, Company $company)
 {
+    //dd($request->all());
     $request->validate([
         'name'         => 'required|string|max:255',
-        'email'        => 'required|email|max:255',
+        'email'        => [
+            'required',
+            'email',
+            'max:255',
+            Rule::unique('companies')->ignore($company->id)
+        ],
         'phone'        => 'nullable|string|max:20',
         'provider'     => 'nullable|string|max:50',
         'status'       => 'required|in:active,inactive,pending',
@@ -60,26 +67,35 @@ class AdminCompanyController extends Controller
         'password'     => 'nullable|string|min:8|confirmed',
     ]);
 
-    // update normal fields
-    $company->fill($request->except(['logo', 'password', 'remove_logo']));
+    // Update fields
+    $company->name = $request->name;
+    $company->email = $request->email;
+    $company->phone = $request->phone;
+    $company->provider = $request->provider;
+    $company->status = $request->status;
+    $company->company_desc = $request->company_desc;
 
-    // update password only if entered
+    // Update password only if entered
     if ($request->filled('password')) {
         $company->password = Hash::make($request->password);
     }
 
-    // remove logo if checked
-    if ($request->remove_logo && $company->logo) {
+    // Handle logo removal
+    if ($request->boolean('remove_logo') && $company->logo) {
         Storage::disk('public')->delete($company->logo);
         $company->logo = null;
     }
 
-    // upload new logo
+    // Handle new logo upload
     if ($request->hasFile('logo')) {
+        // Delete old logo if exists
         if ($company->logo) {
             Storage::disk('public')->delete($company->logo);
         }
-        $company->logo = $request->file('logo')->store('companies/logos', 'public');
+        
+        // Store new logo
+        $path = $request->file('logo')->store('companies/logos', 'public');
+        $company->logo = $path;
     }
 
     $company->save();

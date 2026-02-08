@@ -50,7 +50,7 @@
                   <h5 class="font-weight-bolder mb-0">{{ $stats['draft'] ?? 0 }}</h5>
                 </div>
                 <div class="col-4 text-end">
-                  <div class="icon icon-shape bg-gradient-secondary shadow text-center border-radius-md">
+                  <div class="icon icon-shape bg-gradient-warning shadow text-center border-radius-md">
                     <i class="material-symbols-rounded opacity-10">draft</i>
                   </div>
                 </div>
@@ -68,7 +68,7 @@
                   <h5 class="font-weight-bolder mb-0">{{ $stats['completed'] ?? 0 }}</h5>
                 </div>
                 <div class="col-4 text-end">
-                  <div class="icon icon-shape bg-gradient-info shadow text-center border-radius-md">
+                  <div class="icon icon-shape bg-gradient-warning shadow text-center border-radius-md">
                     <i class="material-symbols-rounded opacity-10">inventory</i>
                   </div>
                 </div>
@@ -86,7 +86,7 @@
                   <h5 class="font-weight-bolder mb-0">Tsh{{ number_format($stats['total_value'] ?? 0, 2) }}</h5>
                 </div>
                 <div class="col-4 text-end">
-                  <div class="icon icon-shape bg-gradient-success shadow text-center border-radius-md">
+                  <div class="icon icon-shape bg-gradient-warning shadow text-center border-radius-md">
                     <i class="material-symbols-rounded opacity-10">attach_money</i>
                   </div>
                 </div>
@@ -224,6 +224,11 @@
                                   title="View">
                             <i class="material-symbols-rounded" style="font-size: 18px;">visibility</i>
                           </button>
+                          <a href="{{ route('admin.receipt.download', $receipt->id) }}">
+                          <button type="button" class="btn btn-link text-success px-2 mb-0">
+                            <i class="material-symbols-rounded" style="font-size: 18px;">download</i>
+                          </button>
+                          </a>
                           @if($receipt->status === 'draft')
                           <button type="button" class="btn btn-link text-warning px-2 mb-0" 
                                   data-bs-toggle="modal" data-bs-target="#editReceiptModal{{ $receipt->id }}" 
@@ -430,14 +435,6 @@
             </div>
             
             <!-- Notes -->
-            <div class="row g-2">
-              <div class="col-md-12">
-                <div class="form-group mb-3">
-                  <label for="quality_notes" class="form-control-label">Quality Notes</label>
-                  <textarea class="form-control form-control-sm" name="quality_notes" rows="2"></textarea>
-                </div>
-              </div>
-            </div>
             
             <div class="row g-2">
               <div class="col-md-12">
@@ -688,8 +685,8 @@
           <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
             <div class="alert alert-info">
               <div class="d-flex">
-                <i class="material-symbols-rounded me-2">info</i>
-                <span class="text-sm">Editing receipt: {{ $receipt->receipt_number }}</span>
+                <i class="material-symbols-rounded me-2 text-white">info</i>
+                <span class="text-sm text-white">Editing receipt: {{ $receipt->receipt_number }}</span>
               </div>
             </div>
             
@@ -851,8 +848,13 @@
               <div class="col-md-12">
                 <div class="form-group mb-3">
                   <label for="quality_notes_{{ $receipt->id }}" class="form-control-label">Quality Notes</label>
-                  <textarea class="form-control form-control-sm" name="quality_notes" 
-                            id="quality_notes_{{ $receipt->id }}" rows="2">{{ $receipt->quality_notes }}</textarea>
+                 <select class="form-control form-control-sm" name="status" id="status_{{ $receipt->id }}" required>
+                    <option value="draft" {{ $receipt->status == 'draft' ? 'selected' : '' }}>Draft</option>
+                    <option value="partial" {{ $receipt->status == 'partial' ? 'selected' : '' }}>Partial</option>
+                    <option value="completed" {{ $receipt->status == 'completed' ? 'selected' : '' }}>Completed</option>
+                    <option value="verified" {{ $receipt->status == 'verified' ? 'selected' : '' }}>Verified</option>
+                    <option value="cancelled" {{ $receipt->status == 'cancelled' ? 'selected' : '' }}>Cancelled</option>
+                </select>
                 </div>
               </div>
             </div>
@@ -1039,7 +1041,6 @@
             return;
         }
         
-        // Show loading
         const itemsContainer = document.getElementById('receipt-items-container');
         itemsContainer.innerHTML = `
             <div class="text-center py-3">
@@ -1050,11 +1051,9 @@
             </div>
         `;
         
-        // Fetch PO details
         fetch(`/admin/receipts/purchase-order/${selectElement.value}/details`)
             .then(response => response.json())
             .then(data => {
-                // Show PO info
                 const poInfo = document.getElementById('po-info');
                 document.getElementById('po-number-display').textContent = data.po?.po_number || 'N/A';
                 document.getElementById('supplier-display').textContent = data.po?.supplier_name || 'N/A';
@@ -1062,59 +1061,63 @@
                 document.getElementById('remaining-display').textContent = data.remaining || 0;
                 poInfo.classList.remove('d-none');
                 
-                // Populate items
                 populateItems(data.items || []);
             })
             .catch(error => {
                 console.error('Error:', error);
-                itemsContainer.innerHTML = `
-                    <div class="alert alert-danger">
-                        Error loading PO details. Please try again.
-                    </div>
-                `;
+                itemsContainer.innerHTML = `<div class="alert alert-danger">Error loading PO details. Please try again.</div>`;
             });
     }
     
-    // Simple populate items
-    // Simple populate items
-function populateItems(items) {
-    const container = document.getElementById('receipt-items-container');
-    let html = '';
-    
-    if (items.length === 0) {
-        html = '<div class="alert alert-info">No items found in this purchase order.</div>';
-    } else {
+    // Populate items - SIMPLE WORKING VERSION
+    function populateItems(items) {
+        const container = document.getElementById('receipt-items-container');
+        
+        if (items.length === 0) {
+            container.innerHTML = '<div class="alert alert-info">No items found in this purchase order.</div>';
+            return;
+        }
+        
+        let html = '';
+        let totalQuantity = 0;
+        let totalAmount = 0;
+        
         items.forEach((item, index) => {
-            const description = item.description || '';
-            const quantityOrdered = item.quantity_ordered || 0;
-            const price = parseFloat(item.price) || 0;
-            const remaining = item.remaining || 0;
-            const unit = item.unit || 'pc';
+            const description = String(item.description || '');
+            const quantityOrdered = Number(item.quantity_ordered || item.quantity || 0);
+            const price = Number(item.price || 0);
+            const remaining = Number(item.remaining || item.quantity || quantityOrdered);
+            const unit = String(item.unit || 'pcs');
+            
+            // Calculate total = remaining × price
+            const itemTotal = remaining * price;
+            totalQuantity += remaining;
+            totalAmount += itemTotal;
             
             html += `
                 <div class="item-row mb-3 p-2 border rounded">
                     <div class="row g-2">
                         <div class="col-md-5">
-                            <input type="text" class="form-control form-control-sm" 
-                                   value="${description}" readonly>
+                            <input type="text" class="form-control form-control-sm" value="${description}" readonly>
                             <input type="hidden" name="items[${index}][description]" value="${description}">
                             <input type="hidden" name="items[${index}][price]" value="${price}">
                             <input type="hidden" name="items[${index}][unit]" value="${unit}">
                             <input type="hidden" name="items[${index}][quantity_ordered]" value="${quantityOrdered}">
                         </div>
                         <div class="col-md-2">
-                            <input type="number" class="form-control form-control-sm" 
-                                   value="${quantityOrdered}" readonly>
+                            <input type="number" class="form-control form-control-sm" value="${quantityOrdered}" readonly>
                         </div>
                         <div class="col-md-2">
-                            <input type="number" class="form-control form-control-sm receipt-quantity" 
+                            <input type="number" 
+                                   class="form-control form-control-sm receipt-quantity" 
                                    name="items[${index}][quantity_received]" 
                                    min="0" 
                                    max="${remaining}"
-                                   value="0" 
+                                   value="${remaining}"
                                    data-price="${price}"
-                                   required
-                                   oninput="calculateTotal()">
+                                   data-index="${index}"
+                                   oninput="updateItemTotal(${index})"
+                                   required>
                         </div>
                         <div class="col-md-2">
                             <input type="text" class="form-control form-control-sm" value="${unit}" readonly>
@@ -1127,42 +1130,87 @@ function populateItems(items) {
                         <div class="col-md-12">
                             <small class="text-muted">
                                 Price: Tsh${price.toFixed(2)} | 
-                                Total: <span id="item-total-${index}">Tsh0.00</span>
+                                Total: <span id="item-total-${index}">Tsh${itemTotal.toFixed(2)}</span>
                             </small>
                         </div>
                     </div>
                 </div>
             `;
         });
+        
+        container.innerHTML = html;
+        
+        // Update summary with initial totals
+        document.getElementById('total-received-summary').value = 
+            `${totalQuantity} units / Tsh${totalAmount.toFixed(2)}`;
     }
     
-    container.innerHTML = html;
-    calculateTotal();
-}
-    // Calculate totals
-    function calculateTotal() {
+    // Update individual item total
+    function updateItemTotal(index) {
+        console.log(`Updating item ${index}...`);
+        
+        // Get the quantity input
+        const input = document.querySelector(`.receipt-quantity[data-index="${index}"]`);
+        if (!input) {
+            console.error(`Cannot find input with data-index="${index}"`);
+            return;
+        }
+        
+        // Get values
+        const quantity = parseFloat(input.value) || 0;
+        const price = parseFloat(input.dataset.price) || 0;
+        const total = quantity * price;
+        
+        console.log(`Item ${index}: ${quantity} × ${price} = ${total}`);
+        
+        // Update the item total display
+        const totalElement = document.getElementById(`item-total-${index}`);
+        if (totalElement) {
+            totalElement.textContent = `Tsh${total.toFixed(2)}`;
+        } else {
+            console.error(`Cannot find element with id="item-total-${index}"`);
+        }
+        
+        // Update the grand total
+        updateGrandTotal();
+    }
+    
+    // Update grand total (summary)
+    function updateGrandTotal() {
+        console.log("Updating grand total...");
+        
         let totalQuantity = 0;
         let totalAmount = 0;
         
-        // Calculate each item
-        document.querySelectorAll('.receipt-quantity').forEach((input, index) => {
+        // Get all quantity inputs
+        const inputs = document.querySelectorAll('.receipt-quantity');
+        console.log(`Found ${inputs.length} quantity inputs`);
+        
+        inputs.forEach((input, index) => {
             const quantity = parseFloat(input.value) || 0;
             const price = parseFloat(input.dataset.price) || 0;
             const itemTotal = quantity * price;
             
-            // Update item total display
-            const itemTotalElement = document.getElementById(`item-total-${index}`);
-            if (itemTotalElement) {
-                itemTotalElement.textContent = `Tsh${itemTotal.toFixed(2)}`;
-            }
-            
             totalQuantity += quantity;
             totalAmount += itemTotal;
+            
+            console.log(`Input ${index}: Qty=${quantity}, Price=${price}, ItemTotal=${itemTotal}`);
         });
         
+        console.log(`Grand Total: ${totalQuantity} units, Tsh${totalAmount.toFixed(2)}`);
+        
         // Update summary
-        document.getElementById('total-received-summary').value = 
-            `${totalQuantity} units / Tsh${totalAmount.toFixed(2)}`;
+        const summaryElement = document.getElementById('total-received-summary');
+        if (summaryElement) {
+            summaryElement.value = `${totalQuantity} units / Tsh${totalAmount.toFixed(2)}`;
+        } else {
+            console.error("Cannot find element with id='total-received-summary'");
+        }
+    }
+    
+    // Update total received (reset)
+    function updateTotalReceived() {
+        document.getElementById('total-received-summary').value = '0 units / Tsh0.00';
     }
     
     // Toggle return reason
@@ -1174,6 +1222,7 @@ function populateItems(items) {
             textarea.setAttribute('required', 'required');
         } else {
             textarea.removeAttribute('required');
+            textarea.value = '';
         }
     }
     
@@ -1185,12 +1234,43 @@ function populateItems(items) {
                 document.getElementById('receipt_number').value = data.receipt_number;
             })
             .catch(() => {
-                // Fallback if API fails
                 const date = new Date();
                 const random = Math.floor(Math.random() * 10000);
                 document.getElementById('receipt_number').value = `RC-${date.getFullYear()}${String(date.getMonth()+1).padStart(2,'0')}${String(date.getDate()).padStart(2,'0')}-${random}`;
             });
     });
+    
+    // DEBUG FUNCTION - Add this button to your HTML temporarily
+    function debugCalculations() {
+        console.log("=== DEBUG CALCULATIONS ===");
+        
+        // Check if items are loaded
+        const items = document.querySelectorAll('.item-row');
+        console.log(`Item rows found: ${items.length}`);
+        
+        // Check quantity inputs
+        const inputs = document.querySelectorAll('.receipt-quantity');
+        console.log(`Quantity inputs found: ${inputs.length}`);
+        
+        // Check data attributes
+        inputs.forEach((input, i) => {
+            console.log(`Input ${i}:`, {
+                value: input.value,
+                price: input.dataset.price,
+                index: input.dataset.index,
+                hasOnInput: input.hasAttribute('oninput')
+            });
+        });
+        
+        // Check total elements
+        for (let i = 0; i < inputs.length; i++) {
+            const totalElement = document.getElementById(`item-total-${i}`);
+            console.log(`Total element ${i}:`, totalElement ? totalElement.textContent : 'NOT FOUND');
+        }
+        
+        // Test calculation
+        updateGrandTotal();
+    }
     
     // Show success/error messages
     @if(session('success'))
@@ -1226,6 +1306,6 @@ function populateItems(items) {
         const bsToast = new bootstrap.Toast(toast, { delay: 3000 });
         bsToast.show();
     }
-  </script>
+</script>
 </body>
 </html>

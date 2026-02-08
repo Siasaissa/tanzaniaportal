@@ -8,6 +8,7 @@ use App\Models\PurchaseOrder;
 use App\Models\Company;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class AdminReceiptController extends Controller
 {
@@ -26,8 +27,7 @@ class AdminReceiptController extends Controller
             ->paginate(15);
         
         // Get only eligible purchase orders (not fully received yet)
-        $purchaseOrders = PurchaseOrder::where('company_id', $companyId)
-            ->whereIn('status', ['approved', 'ordered'])
+        $purchaseOrders = PurchaseOrder::whereIn('status', ['approved', 'ordered'])
             ->with('receipts') // Eager load receipts for calculation
             ->orderBy('po_date', 'desc')
             ->get()
@@ -290,6 +290,7 @@ class AdminReceiptController extends Controller
             'storage_location' => $request->storage_location,
             'bin_location' => $request->bin_location,
             'notes' => $request->notes,
+            'status' => $request->status
         ]);
         
         return redirect()->route('admin.receipt.index')
@@ -354,14 +355,17 @@ class AdminReceiptController extends Controller
     /**
      * Download PDF
      */
+
+
     public function download(Receipt $receipt)
-    {
-        $this->checkAccess($receipt);
-        
-        // For now, just redirect back - add PDF later
-        return redirect()->back()
-            ->with('info', 'PDF download will be available soon');
-    }
+{
+    $pdf = PDF::loadView('admin.receipt.pdf', compact('receipt'))
+              ->setPaper('a4', 'portrait');
+
+    $filename = 'receipt-' . preg_replace('/[^A-Za-z0-9\-]/', '_', $receipt->receipt_number) . '.pdf';
+
+    return $pdf->download($filename);
+}
 
     /**
      * Print/View PDF

@@ -108,7 +108,7 @@
                 </a>
             </li>
 
-            <!-- Settings -->
+            <!-- 
             <li class="nav-item">
                 <a class="nav-link {{ activeLink('admin.setting.*') }}"
                    href="{{ route('admin.setting.index') }}">
@@ -116,6 +116,7 @@
                     <span class="nav-link-text ms-1">Settings</span>
                 </a>
             </li>
+            Settings -->
             
             <!-- Register Company -->
             <li class="nav-item">
