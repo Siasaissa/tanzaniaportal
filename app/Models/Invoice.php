@@ -81,7 +81,7 @@ class Invoice extends Model
     }
 
     /**
-     * Generate unique invoice number
+     * Generate unique invoice number for admin
      */
     public static function generateInvoiceNumber($companyId)
     {
@@ -103,6 +103,31 @@ class Invoice extends Model
         return sprintf('INV-%s-%s%s-%04d', $companyCode, $year, $month, $count);
     }
 
+    /**
+     * Generate unique invoice number for company
+     */
+
+    public static function generateInvoiceNumberC()
+{
+    // Get the authenticated company user
+    $company = Auth::guard('company')->user();
+    
+    if (!$company) {
+        throw new \Exception('Company user must be logged in');
+    }
+    
+    $companyCode = strtoupper(substr($company->name, 0, 3));
+    $year = date('Y');
+    $month = date('m');
+    
+    // Count only for this company (remove orWhereNull)
+    $count = static::where('company_id', $company->id)
+                ->whereYear('created_at', $year)
+                ->whereMonth('created_at', $month)
+                ->count() + 1;
+    
+    return sprintf('INV-%s-%s%s-%04d', $companyCode, $year, $month, $count);
+}
     
 
     /**

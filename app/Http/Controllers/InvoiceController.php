@@ -113,7 +113,7 @@ class InvoiceController extends Controller
         $invoice = Invoice::create([
             'delivery_note_id' => $request->delivery_note_id,
             'company_id' => $companyId,
-            'invoice_number' => $request->invoice_number ?? Invoice::generateInvoiceNumber($companyId),
+            'invoice_number' => $request->invoice_number ?? Invoice::generateInvoiceNumberC($companyId),
             'invoice_date' => $request->invoice_date,
             'due_date' => $request->due_date,
             'client_name' => $quotation->client_name ?? 'N/A',
@@ -316,7 +316,7 @@ class InvoiceController extends Controller
     public function generateNumber()
     {
         $companyId = auth()->user()->company_id ?? 1;
-        $number = Invoice::generateInvoiceNumber($companyId);
+        $number = Invoice::generateInvoiceNumberC($companyId);
         
         return response()->json(['invoice_number' => $number]);
     }

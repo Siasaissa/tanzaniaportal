@@ -46,7 +46,7 @@ class PurchaseOrderController extends Controller
     public function create()
     {
         $companyId = auth()->user()->company_id ?? 1;
-        $poNumber = PurchaseOrder::generatePONumber($companyId);
+        $poNumber = PurchaseOrder::generatePONumberC($companyId);
         
         return view('company.purchase-order.create', compact('poNumber'));
     }
@@ -290,7 +290,7 @@ class PurchaseOrderController extends Controller
     public function generateNumber()
     {
         $companyId = auth()->user()->company_id ?? 1;
-        $number = PurchaseOrder::generatePONumber($companyId);
+        $number = PurchaseOrder::generatePONumberC($companyId);
         
         return response()->json(['po_number' => $number]);
     }

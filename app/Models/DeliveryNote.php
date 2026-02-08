@@ -52,7 +52,7 @@ class DeliveryNote extends Model
 
 
     /**
-     * Generate unique delivery note number
+     * Generate unique delivery note number for admin
      */
     public static function generateDeliveryNoteNumber($companyId)
     {
@@ -71,7 +71,34 @@ class DeliveryNote extends Model
 
         return sprintf('DN-%s-%s%s-%04d', $companyCode, $year, $month, $count);
     }
+
+
+        /**
+     * Generate unique delivery note number for company
+     */
+
+
+public static function generateDeliveryNoteNumberC()
+{
+    // Get the authenticated company user
+    $company = Auth::guard('company')->user();
     
+    if (!$company) {
+        throw new \Exception('Company user must be logged in');
+    }
+    
+    $companyCode = strtoupper(substr($company->name, 0, 3));
+    $year = date('Y');
+    $month = date('m');
+    
+    // Count only for this company (remove orWhereNull)
+    $count = static::where('company_id', $company->id)
+                ->whereYear('created_at', $year)
+                ->whereMonth('created_at', $month)
+                ->count() + 1;
+    
+    return sprintf('DN-%s-%s%s-%04d', $companyCode, $year, $month, $count);
+}
 
     /**
      * Get formatted items

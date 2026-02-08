@@ -76,7 +76,7 @@ class DeliveryNoteController extends Controller
         $deliveryNote = DeliveryNote::create([
             'quotation_id' => $request->quotation_id,
             'company_id' => $companyId,
-            'delivery_note_number' => $request->delivery_note_number ?? DeliveryNote::generateDeliveryNoteNumber($companyId),
+            'delivery_note_number' => $request->delivery_note_number ?? DeliveryNote::generateDeliveryNoteNumberC($companyId),
             'delivery_date' => $request->delivery_date,
             'dispatch_date' => $request->dispatch_date,
             'delivery_address' => $request->delivery_address ?? $this->getClientAddress($quotation),
@@ -253,7 +253,7 @@ class DeliveryNoteController extends Controller
     public function generateNumber()
     {
         $companyId = auth()->user()->company_id ?? 1;
-        $number = DeliveryNote::generateDeliveryNoteNumber($companyId);
+        $number = DeliveryNote::generateDeliveryNoteNumberC($companyId);
         
         return response()->json(['delivery_note_number' => $number]);
     }
