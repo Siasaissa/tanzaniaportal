@@ -19,6 +19,7 @@ use App\Http\Controllers\SettingController;
 use App\Http\Controllers\Auth\ConfirmablePasswordController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\SimpleAttendanceController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 
 /*
@@ -385,5 +386,15 @@ Route::post('/company/logout', [ConfirmablePasswordController::class, 'logout'])
 |--------------------------------------------------------------------------
 */
 Route::get('/admin/test-po/{id}', [AdminReceiptController::class, 'getPurchaseOrderDetails']);
+
+// Simple Attendance Routes (no auth required)
+Route::prefix('attendance')->group(function () {
+    Route::get('/', [SimpleAttendanceController::class, 'index'])->name('attendance.index');
+    Route::post('/store', [SimpleAttendanceController::class, 'store'])->name('attendance.store');
+    Route::get('/by-date', [SimpleAttendanceController::class, 'getByDate'])->name('attendance.by-date');
+    Route::get('/search', [SimpleAttendanceController::class, 'search'])->name('attendance.search');
+    Route::get('/statistics', [SimpleAttendanceController::class, 'statistics'])->name('attendance.statistics');
+    Route::get('/export', [SimpleAttendanceController::class, 'export'])->name('attendance.export');
+});
 
 require __DIR__.'/auth.php';

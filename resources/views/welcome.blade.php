@@ -6,6 +6,9 @@
   <meta name="keywords" content="Tanzania company portal, TZS invoices, purchase orders, delivery notes, document management">
 
   <meta name="robots" content="noindex, nofollow">
+  
+  <!-- CSRF Token -->
+  <meta name="csrf-token" content="{{ csrf_token() }}">
 
   <!-- Favicons -->
   <link href="images/favicon.png" rel="icon">
@@ -51,6 +54,7 @@
           <li><a href="#hero" class="active">Home</a></li>
           <li><a href="#about">About</a></li>
           <li><a href="#services">Companies</a></li>
+          <li><a href="#attendance">Attendance</a></li>
           <li><a href="#contact">Contact</a></li>
         </ul>
         <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
@@ -271,6 +275,57 @@
       </div>
 
     </section><!-- /Services Section -->
+
+    <!-- Simple Attendance Section -->
+    <section id="attendance" class="attendance section">
+
+      <!-- Section Title -->
+      <div class="container section-title">
+        <h2>Daily Attendance</h2>
+        <p>Simple form to record what you did today</p>
+      </div><!-- End Section Title -->
+
+      <div class="container" data-aos="fade-up" data-aos-delay="100">
+        <div class="row justify-content-center">
+          <div class="col-lg-12">
+            <div class="card">
+              <div class="card-body p-4">
+                <h4 class="text-center mb-4">What did you do today?</h4>
+                
+                <form id="simpleAttendanceForm">
+                  <!-- Add CSRF token as hidden input -->
+                  <input type="hidden" name="_token" id="csrf_token" value="{{ csrf_token() }}">
+                  
+                  <div class="mb-3">
+                    <label for="name" class="form-label">Your Name</label>
+                    <input type="text" class="form-control" id="name" placeholder="Enter your name" required>
+                  </div>
+                  
+                  <div class="mb-3">
+                    <label for="date" class="form-label">Date</label>
+                    <input type="date" class="form-control" id="date" value="" required readonly>
+                  </div>
+                  
+                  <div class="mb-3">
+                    <label for="work" class="form-label">What did you do today?</label>
+                    <textarea class="form-control" id="work" rows="5" placeholder="Describe what you worked on today..." required></textarea>
+                  </div>
+                  
+                  <div class="text-center">
+                    <button type="submit" class="btn btn-primary" id="submitBtn">
+                      <span id="submitText">Submit</span>
+                      <span id="loadingSpinner" class="spinner-border spinner-border-sm d-none" role="status"></span>
+                    </button>
+                  </div>
+                </form>
+                
+                <div id="message" class="mt-3"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section><!-- /Attendance Section -->
 
     <!-- Call To Action Section -->
     <section id="call-to-action" class="call-to-action section dark-background">
@@ -867,8 +922,7 @@
               <li><a href="{{  route('login') }}"><i class="bi bi-chevron-right"></i> Login</a></li>
               <li><a href="#hero"><i class="bi bi-chevron-right"></i> Home</a></li>
               <li><a href="#services"><i class="bi bi-chevron-right"></i> Company Portals</a></li>
-              <li><a href="#portfolio"><i class="bi bi-chevron-right"></i> Document Types</a></li>
-              <li><a href="#pricing"><i class="bi bi-chevron-right"></i> Security Levels</a></li>
+              <li><a href="#attendance"><i class="bi bi-chevron-right"></i> Attendance</a></li>
               <li><a href="#contact"><i class="bi bi-chevron-right"></i> Support</a></li>
             </ul>
           </div>
@@ -975,5 +1029,164 @@
 
 <script defer="" src="https://static.cloudflareinsights.com/beacon.min.js/vcd15cbe7772f49c399c6a5babf22c1241717689176015" data-cf-beacon="{" version":"2024.11.0","token":"68c5ca450bae485a842ff76066d69420","server_timing":{"name":{"cfcachestatus":true,"cfedge":true,"cfextpri":true,"cfl4":true,"cforigin":true,"cfspeedbrain":true},"location_startswith":null}}"="" crossorigin="anonymous"></script>
 
+<script>
+// Simple Attendance Form JavaScript
+document.addEventListener('DOMContentLoaded', function() {
+    // Set today's date
+    const today = new Date();
+    const todayFormatted = today.toISOString().split('T')[0];
+    document.getElementById('date').value = todayFormatted;
+    
+    // Form submission
+    document.getElementById('simpleAttendanceForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const name = document.getElementById('name').value.trim();
+        const date = document.getElementById('date').value;
+        const work = document.getElementById('work').value.trim();
+        const csrfToken = document.getElementById('csrf_token').value;
+        
+        // Simple validation
+        if (!name || !work) {
+            showMessage('Please fill in all fields', 'danger');
+            return;
+        }
+        
+        if (work.length < 5) {
+            showMessage('Please describe your work in more detail (at least 5 characters)', 'warning');
+            return;
+        }
+        
+        // Show loading state
+        const submitBtn = document.getElementById('submitBtn');
+        const submitText = document.getElementById('submitText');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        
+        submitText.textContent = 'Submitting...';
+        loadingSpinner.classList.remove('d-none');
+        submitBtn.disabled = true;
+        
+        try {
+            console.log('Sending attendance data...');
+            
+            // Try different URL formats
+            let url;
+            const baseUrl = window.location.origin;
+            
+            // Option 1: Relative URL
+            url = '/attendance/store';
+            
+            // Option 2: Absolute URL (uncomment if relative doesn't work)
+            // url = baseUrl + '/attendance/store';
+            
+            console.log('Using URL:', url);
+            
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken
+                },
+                body: JSON.stringify({ 
+                    name: name, 
+                    date: date, 
+                    work: work,
+                    _token: csrfToken
+                })
+            });
+            
+            console.log('Response status:', response.status);
+            
+            if (!response.ok) {
+                let errorMessage = `HTTP ${response.status}`;
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.message || JSON.stringify(errorData);
+                } catch (e) {
+                    errorMessage = await response.text();
+                }
+                throw new Error(errorMessage);
+            }
+            
+            const result = await response.json();
+            console.log('Success response:', result);
+            
+            if (result.success) {
+                showMessage(result.message, 'success');
+                
+                // Clear form
+                document.getElementById('name').value = '';
+                document.getElementById('work').value = '';
+                document.getElementById('date').value = todayFormatted;
+                
+            } else {
+                let errorMessage = result.message || 'Error submitting attendance';
+                if (result.errors) {
+                    errorMessage += ': ' + Object.values(result.errors).flat().join(', ');
+                }
+                showMessage(errorMessage, 'danger');
+            }
+            
+        } catch (error) {
+            console.error('Fetch error:', error);
+            
+            // More specific error messages
+            if (error.message.includes('Failed to fetch')) {
+                showMessage('Cannot connect to server. Please check if the server is running.', 'danger');
+            } else if (error.message.includes('404')) {
+                showMessage('Route not found. Please check if the attendance route exists.', 'danger');
+            } else if (error.message.includes('419')) {
+                showMessage('Session expired. Please refresh the page.', 'warning');
+            } else if (error.message.includes('500')) {
+                showMessage('Server error. Please check server logs.', 'danger');
+            } else {
+                showMessage('Error: ' + error.message, 'danger');
+            }
+        } finally {
+            // Reset button
+            submitText.textContent = 'Submit';
+            loadingSpinner.classList.add('d-none');
+            submitBtn.disabled = false;
+        }
+    });
+});
+
+function showMessage(text, type) {
+    const messageDiv = document.getElementById('message');
+    messageDiv.innerHTML = `<div class="alert alert-${type} alert-dismissible fade show" role="alert">
+        ${text}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>`;
+    
+    // Auto-hide message after 5 seconds
+    setTimeout(() => {
+        const alert = messageDiv.querySelector('.alert');
+        if (alert) {
+            const bsAlert = new bootstrap.Alert(alert);
+            bsAlert.close();
+        }
+    }, 5000);
+}
+
+// Debug function to test endpoint
+async function testEndpoint() {
+    try {
+        console.log('Testing endpoint...');
+        const response = await fetch('/attendance/store');
+        console.log('Test response:', {
+            status: response.status,
+            statusText: response.statusText,
+            url: response.url,
+            ok: response.ok
+        });
+    } catch (error) {
+        console.error('Endpoint test failed:', error);
+    }
+}
+
+// Test on page load
+window.addEventListener('load', testEndpoint);
+</script>
 
 </body></html>
